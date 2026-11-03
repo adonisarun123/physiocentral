@@ -5,6 +5,7 @@ import { getOpeningHours, getPublicBranches, getPublicClinic } from "@/modules/c
 import { telHref, displayPhone, dayHours, groupHours } from "@/lib/format";
 import { Logo } from "@/components/site/logo";
 import { RevealRoot } from "@/components/site/reveal";
+import { OrthoReferralBand, ORTHO } from "@/components/site/ortho-referral";
 
 export const dynamic = "force-dynamic";
 
@@ -74,6 +75,8 @@ export default async function PublicLayout({ children }: { children: React.React
         {phone ? <a href={telHref(phone)} className="btn btn-secondary flex-1"><Phone size={18} aria-hidden="true" /> Call</a> : null}
       </div>
 
+      <OrthoReferralBand />
+
       <footer className="band on-band">
         <div className="wrap grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1.2fr]">
           <div>
@@ -88,6 +91,7 @@ export default async function PublicLayout({ children }: { children: React.React
             <ul className="mt-4 space-y-3">
               {NAV.map((n) => <li key={n.href}><Link href={n.href} className="muted no-underline hover:text-white hover:underline">{n.label}</Link></li>)}
               <li><Link href="/book" className="muted no-underline hover:text-white hover:underline">Book online</Link></li>
+              <li><a href={ORTHO.url} target="_blank" rel="noopener" className="muted no-underline hover:text-white hover:underline">Orthopaedic consultation ↗</a></li>
             </ul>
           </nav>
           <div>
