@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 // Security headers (SEC-05). CSP keeps to self; no third-party scripts are loaded.
 // 'unsafe-inline' for scripts is required by Next's inline bootstrap without a nonce
@@ -21,6 +22,10 @@ const nextConfig: NextConfig = {
   // private pages must never land in a shared cache (SEC-04).
   cacheComponents: false,
   poweredByHeader: false,
+  // Pin the workspace root: a stray package-lock.json / node_modules in a parent
+  // folder (e.g. the home directory) must not change module resolution.
+  turbopack: { root: path.resolve(process.cwd()) },
+  outputFileTracingRoot: path.resolve(process.cwd()),
   serverExternalPackages: ["pg"],
   async headers() {
     return [
