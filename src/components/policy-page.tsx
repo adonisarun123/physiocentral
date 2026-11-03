@@ -1,26 +1,47 @@
-import { Notice } from "@/components/ui";
+import type { Metadata } from "next";
 import { PageHero } from "@/components/site/page-hero";
+import { Markdown, headings } from "@/components/site/markdown";
+import { POLICIES } from "@/content/policies";
+import { getPublicBranches, getPublicClinic } from "@/modules/content/public";
+import { displayPhone } from "@/lib/format";
 
-const SUMMARY: Record<string, string> = {
-  privacy:
-    "We collect only what is needed to handle your appointment request: name, contact number, optional email, and an optional short reason for visit. Detailed medical history is collected later through a secure intake. Marketing messages are sent only if you opt in, and you can withdraw at any time.",
-  terms: "Use of this website is subject to terms the clinic will publish here.",
-  "cancellation-refunds":
-    "An appointment request is not a confirmed booking until the clinic confirms it. The clinic's cancellation, no-show and refund policy will be published here before online payments are offered.",
-  accessibility:
-    "We aim to meet WCAG 2.2 AA. If anything on this site is hard to use, or you need help at the clinic (for example step-free access or a longer appointment), please call us or mention it in your request.",
-};
+type Kind = keyof typeof POLICIES;
 
-/** Policy text is a DRAFT until approved by the clinic and its advisers (§24). */
-export function PolicyPage({ title, kind }: { title: string; kind: string }) {
+export function policyMetadata(kind: Kind): Metadata {
+  const p = POLICIES[kind];
+  return { title: p.title, description: p.description, alternates: { canonical: `/${kind}` } };
+}
+
+export async function PolicyPage({ kind }: { kind: Kind }) {
+  const p = POLICIES[kind];
+  const [clinic, branches] = await Promise.all([getPublicClinic(), getPublicBranches()]);
+  const b = branches[0];
+  const phone = b?.phone ?? clinic?.phone;
+  const address = b?.addressVerified ? [b.addressLine, b.locality, b.city, b.postalCode].filter(Boolean).join(", ") : "HSR Layout, Bengaluru";
+  const body = p.body
+    .replaceAll("{{clinic}}", clinic?.tradeName ?? "Physio Central")
+    .replaceAll("{{phone}}", phone ? displayPhone(phone) : "the clinic")
+    .replaceAll("{{address}}", address)
+    .replaceAll("{{email_sentence}}", clinic?.email ? ` or email ${clinic.email}.` : ".");
+  const toc = headings(body);
+
   return (
     <>
-      <PageHero eyebrow="Policies" title={title} />
-      <div className="wrap section max-w-3xl">
-        <Notice tone="warn" title="Draft — awaiting clinic approval">
-          This page holds a plain-language summary. The approved policy text will replace it before launch.
-        </Notice>
-        <p className="body-large prose-clinic mt-8">{SUMMARY[kind]}</p>
+      <PageHero eyebrow="Policies" title={p.title} lead={<span className="body-medium">Last updated {p.updated}</span>} />
+      <div className="wrap section grid gap-12 lg:grid-cols-[16rem_1fr]">
+        {toc.length > 2 ? (
+          <nav aria-label="On this page" className="hidden lg:block">
+            <div className="sticky top-28">
+              <p className="title-small">On this page</p>
+              <ul className="body-medium mt-3 space-y-2 border-l border-[var(--color-line)] pl-4">
+                {toc.map((h) => <li key={h.id}><a href={`#${h.id}`} className="text-[var(--color-ink-muted)] no-underline hover:text-[var(--color-ink)] hover:underline">{h.text}</a></li>)}
+              </ul>
+            </div>
+          </nav>
+        ) : <div className="hidden lg:block" />}
+        <article className="max-w-[68ch] [&>div>h2:first-child]:mt-0">
+          <Markdown source={body} />
+        </article>
       </div>
     </>
   );

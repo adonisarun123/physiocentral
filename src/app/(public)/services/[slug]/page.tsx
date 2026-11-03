@@ -48,7 +48,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
         name: s.name,
         description: s.summary,
         serviceType: "Physiotherapy",
-        provider: { "@id": siteUrl("/locations/main#clinic") },
+        provider: { "@id": siteUrl("/contact#clinic") },
         areaServed: "HSR Layout, Bengaluru",
       },
     ],

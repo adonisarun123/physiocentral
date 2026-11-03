@@ -11,6 +11,8 @@ const csp = [
   "img-src 'self' data: blob:",
   "font-src 'self'",
   "connect-src 'self'",
+  // Google Maps embed on /contact.
+  "frame-src https://www.google.com https://maps.google.com",
   "frame-ancestors 'none'",
   "base-uri 'self'",
   "form-action 'self'",
@@ -27,6 +29,10 @@ const nextConfig: NextConfig = {
   turbopack: { root: path.resolve(process.cwd()) },
   outputFileTracingRoot: path.resolve(process.cwd()),
   serverExternalPackages: ["pg"],
+  // "Visit us" was merged into /contact (2026-11).
+  async redirects() {
+    return [{ source: "/locations/:slug", destination: "/contact#visit", permanent: true }];
+  },
   async headers() {
     return [
       {

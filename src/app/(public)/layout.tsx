@@ -5,6 +5,7 @@ import { getOpeningHours, getPublicBranches, getPublicClinic } from "@/modules/c
 import { telHref, displayPhone, dayHours, groupHours } from "@/lib/format";
 import { Logo } from "@/components/site/logo";
 import { RevealRoot } from "@/components/site/reveal";
+import { OrthoReferralBand, ORTHO } from "@/components/site/ortho-referral";
 
 export const dynamic = "force-dynamic";
 
@@ -12,8 +13,8 @@ const NAV = [
   { href: "/services", label: "Services" },
   { href: "/team", label: "Our team" },
   { href: "/about", label: "About" },
-  { href: "/locations/main", label: "Visit us" },
-  { href: "/contact", label: "Contact" },
+  { href: "/blog", label: "Blog" },
+  { href: "/contact", label: "Contact & visit" },
 ];
 
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
@@ -36,7 +37,7 @@ export default async function PublicLayout({ children }: { children: React.React
             {weekdayHours ? <span className="hidden items-center gap-2 md:flex"><Clock size={14} aria-hidden="true" /> Mon–Sat · {weekdayHours}</span> : null}
           </span>
           <span className="flex items-center gap-6">
-            <Link href="/locations/main" className="hidden text-[var(--md-sys-color-inverse-on-surface)] no-underline hover:underline sm:inline">Patient info</Link>
+            <Link href="/contact#visit" className="hidden text-[var(--md-sys-color-inverse-on-surface)] no-underline hover:underline sm:inline">Patient info</Link>
             {phone ? <a href={telHref(phone)} className="font-semibold text-white no-underline hover:underline">{displayPhone(phone)}</a> : null}
           </span>
         </div>
@@ -48,7 +49,7 @@ export default async function PublicLayout({ children }: { children: React.React
           <div className="flex items-center gap-2">
             <NavDrawer items={NAV} phone={phone ? (telHref(phone) ?? null) : null} phoneLabel={phone ? displayPhone(phone) : null} header={<Logo name={name} size={38} />} />
             <Link href="/" className="no-underline" aria-label={`${name} home`}><Logo name={name} /></Link>
-            <Link href="/locations/main" className="location-pill state ml-3 hidden 2xl:inline-flex whitespace-nowrap">
+            <Link href="/contact#visit" className="location-pill state ml-3 hidden 2xl:inline-flex whitespace-nowrap">
               <MapPin size={16} aria-hidden="true" /> {area} <ChevronDown size={16} aria-hidden="true" />
             </Link>
           </div>
@@ -60,7 +61,6 @@ export default async function PublicLayout({ children }: { children: React.React
             </ul>
           </nav>
           <div className="flex items-center gap-3">
-            <Link href="/contact" className="btn btn-secondary hidden xl:inline-flex">Contact</Link>
             <Link href="/book" className="btn btn-primary hidden sm:inline-flex">Request appointment</Link>
           </div>
         </div>
@@ -73,6 +73,8 @@ export default async function PublicLayout({ children }: { children: React.React
         <Link href="/book" className="btn btn-primary flex-1"><CalendarCheck size={18} aria-hidden="true" /> Book</Link>
         {phone ? <a href={telHref(phone)} className="btn btn-secondary flex-1"><Phone size={18} aria-hidden="true" /> Call</a> : null}
       </div>
+
+      <OrthoReferralBand />
 
       <footer className="band on-band">
         <div className="wrap grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1.2fr]">
@@ -88,6 +90,7 @@ export default async function PublicLayout({ children }: { children: React.React
             <ul className="mt-4 space-y-3">
               {NAV.map((n) => <li key={n.href}><Link href={n.href} className="muted no-underline hover:text-white hover:underline">{n.label}</Link></li>)}
               <li><Link href="/book" className="muted no-underline hover:text-white hover:underline">Book online</Link></li>
+              <li><a href={ORTHO.url} target="_blank" rel="noopener" className="muted no-underline hover:text-white hover:underline">Orthopaedic consultation ↗</a></li>
             </ul>
           </nav>
           <div>
@@ -102,7 +105,7 @@ export default async function PublicLayout({ children }: { children: React.React
             <p className="title-small text-white">Contact</p>
             {phone ? <a href={telHref(phone)} className="font-display mt-4 block text-[1.6rem] leading-tight text-white no-underline hover:underline">{displayPhone(phone)}</a> : null}
             <ul className="mt-4 space-y-3">
-              <li><Link href="/locations/main" className="muted no-underline hover:text-white hover:underline">Get directions</Link></li>
+              <li><Link href="/contact#visit" className="muted no-underline hover:text-white hover:underline">Get directions</Link></li>
               {clinic?.email ? <li><a href={`mailto:${clinic.email}`} className="muted no-underline hover:text-white hover:underline">{clinic.email}</a></li> : null}
             </ul>
           </div>
