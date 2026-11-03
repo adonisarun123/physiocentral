@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "verify:live": "tsx scripts/verify-live.ts"
   },
   "dependencies": {
     "better-auth": "^1.7.15",
