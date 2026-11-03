@@ -8,14 +8,14 @@ const TONES = ["secondary", "tertiary", "primary"] as const;
  * service slug. Replace with real clinic photography when available.
  */
 const STOCK: [RegExp, string][] = [
-  [/assess/, "/images/stock/assess.webp"],
-  [/post-?surg/, "/images/stock/postsurg.webp"],
-  [/sport/, "/images/stock/sports.webp"],
-  [/spine|posture|back|neck/, "/images/stock/spine.webp"],
-  [/strength|functional|balance/, "/images/stock/strength.webp"],
-  [/pain|manual/, "/images/stock/pain.webp"],
-  [/home/, "/images/stock/home.webp"],
-  [/ortho/, "/images/stock/ortho.webp"],
+  [/assess/, "/images/stock/assess-in.webp"],
+  [/post-?surg/, "/images/stock/postsurg-in2.webp"],
+  [/sport/, "/images/stock/sports-in.webp"],
+  [/spine|posture|back|neck/, "/images/stock/spine-in.webp"],
+  [/strength|functional|balance/, "/images/stock/strength-in.webp"],
+  [/pain|manual/, "/images/stock/pain-in3.webp"],
+  [/home/, "/images/stock/home-in.webp"],
+  [/ortho/, "/images/stock/ortho-in.webp"],
 ];
 
 export function serviceImage(slug: string): string | undefined {

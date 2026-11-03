@@ -17,7 +17,7 @@ export function HeroVisual({ live }: { live: HeroLiveData }) {
   return (
     <div className="relative" data-reveal="120">
       <div className="curve-bl relative aspect-[6/5] overflow-hidden bg-[var(--md-sys-color-surface-container-high)]">
-        <Image src="/images/stock/hero.webp" alt="A physiotherapist examining a patient's knee on a treatment table" fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
+        <Image src="/images/stock/hero-in.webp" alt="A physiotherapist explaining a spine model to a patient in a treatment room" fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
       </div>
       <ul className="mt-6 grid gap-3 sm:pointer-events-none sm:absolute sm:inset-0 sm:mt-0 sm:block" aria-label="Clinic status">
         {live.nextSlotLabel ? <LiveCard className="sm:top-6 sm:-left-8" icon={<CalendarCheck size={20} aria-hidden="true" />} tone="tertiary" label="Next available" value={live.nextSlotLabel} /> : null}

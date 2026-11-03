@@ -166,7 +166,7 @@ export default async function HomePage() {
               </div>
             </div>
             <figure className="relative m-0">
-              <MediaPanel icon="Dumbbell" index={1} src="/images/stock/clinic.webp" alt="A physiotherapist guiding a patient through a dumbbell exercise" sizes="(min-width: 768px) 50vw, 100vw" className="curve-br h-full min-h-[22rem]" />
+              <MediaPanel icon="Dumbbell" index={1} src="/images/stock/clinic-in.webp" alt="A woman doing a floor exercise on a mat" sizes="(min-width: 768px) 50vw, 100vw" className="curve-br h-full min-h-[22rem]" />
               <figcaption className="body-small absolute top-3 right-3 rounded-[var(--md-sys-shape-sm)] bg-black/55 px-2 py-1 text-white">Illustrative photo</figcaption>
             </figure>
           </div>
