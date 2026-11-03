@@ -5,6 +5,7 @@ import { ArrowLeft, ArrowRight, CalendarCheck } from "lucide-react";
 import { MediaPanel } from "@/components/site/media";
 import { Markdown, headings } from "@/components/site/markdown";
 import { JsonLd, siteUrl } from "@/modules/content/schema";
+import { ORTHO } from "@/components/site/ortho-referral";
 import { POSTS, getPost, readingMinutes, sortedPosts, fmtDate } from "@/content/blog/posts";
 
 export function generateStaticParams() {
@@ -41,7 +42,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         datePublished: p.date,
         dateModified: p.updated ?? p.date,
         author: { "@type": "Organization", name: p.author },
-        ...(p.reviewedBy ? { reviewedBy: { "@type": "Person", name: p.reviewedBy } } : {}),
+        ...(p.reviewedBy ? { reviewedBy: { "@type": "Person", name: p.reviewedBy, ...(p.reviewedBy === ORTHO.name ? { jobTitle: "Consultant Orthopaedic Surgeon", identifier: ORTHO.registration, url: siteUrl("/about") } : {}) } } : {}),
         publisher: { "@id": siteUrl("/contact#clinic") },
         mainEntityOfPage: siteUrl(`/blog/${p.slug}`),
       },
@@ -70,7 +71,7 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
             <p className="body-large mt-5 text-[var(--color-ink-muted)]">{p.description}</p>
             <p className="body-small mt-6 text-[var(--color-ink-muted)]">
               By {p.author} · <time dateTime={p.date}>{fmtDate(p.date)}</time> · {readingMinutes(p.body)} min read
-              {p.reviewedBy ? <><br />Medically reviewed by {p.reviewedBy}</> : null}
+              {p.reviewedBy ? <><br />Medically reviewed by <Link href="/about#doctor-h">{p.reviewedBy}</Link>{p.reviewedBy === ORTHO.name ? `, MS Orthopaedics (${ORTHO.registration})` : ""}</> : null}
             </p>
           </div>
         </header>

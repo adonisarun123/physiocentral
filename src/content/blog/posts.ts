@@ -16,7 +16,7 @@ export interface Post {
   image: string; // under /public
   imageAlt: string;
   author: string;
-  reviewedBy?: string;
+  reviewedBy?: string; // name of reviewing clinician; registration is shown from ORTHO when it matches
   relatedService?: string; // service slug
   body: string;
 }
@@ -31,6 +31,7 @@ export const POSTS: Post[] = [
     image: "/images/stock/sports-in.webp",
     imageAlt: "Runners in a road race",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "post-surgical-rehabilitation",
     body: `
 An anterior cruciate ligament (ACL) reconstruction is only half the treatment. The other half is rehabilitation, and it decides how well, and how safely, you get back to running, turning and playing sport.
@@ -89,6 +90,7 @@ At Physio Central, ACL rehab follows the operating surgeon's protocol, with mile
     image: "/images/stock/postsurg-in2.webp",
     imageAlt: "A physiotherapist working with a patient's leg",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "post-surgical-rehabilitation",
     body: `
 A total knee replacement (TKR) can relieve years of arthritis pain, but the new joint only works as well as the muscles and movement around it. Physiotherapy in the first three months makes the biggest difference to how well you walk, climb stairs and get back to daily life.
@@ -144,6 +146,7 @@ Yes. For the first weeks after surgery, when travel is difficult, we offer [home
     image: "/images/stock/spine-in.webp",
     imageAlt: "A physiotherapist examining a young man",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "spine-and-posture-care",
     body: `
 Lower back pain is one of the most common reasons people miss work, and it can be frightening when it starts suddenly. The reassuring news: **most back pain is not caused by serious damage**, and the majority of episodes improve within a few weeks.
@@ -194,6 +197,7 @@ At Physio Central, back pain treatment combines a thorough assessment, hands-on 
     image: "/images/stock/pain-in3.webp",
     imageAlt: "A therapist treating a woman's neck and shoulder",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "orthopaedic-physiotherapy",
     body: `
 Frozen shoulder, or **adhesive capsulitis**, happens when the capsule around the shoulder joint becomes inflamed and then thickened and tight. The result is pain and a steady loss of movement, especially reaching up, out to the side, or behind your back.

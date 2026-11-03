@@ -9,6 +9,7 @@ export const ORTHO = {
   contactUrl: "https://drnitinsunkuortho.com/contact",
   name: "Dr Nitin N Sunku",
   credentials: "MBBS, MS Orthopaedics (Gold Medalist) · Fellowship in Arthroscopy & Sports Medicine",
+  registration: "Karnataka Medical Council Reg. No. 117608",
   phone: "+91 99800 31006",
   phoneHref: "tel:+919980031006",
 } as const;

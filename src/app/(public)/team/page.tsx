@@ -23,6 +23,7 @@ export default async function TeamPage() {
               <p className="eyebrow">Clinical lead</p>
               <h2 className="headline-large mt-2">{ORTHO.name}</h2>
               <p className="title-medium mt-2 text-[var(--md-sys-color-primary)]">Consultant orthopaedic surgeon · Arthroscopy, sports medicine &amp; joint replacement</p>
+              <p className="body-small mt-1 text-[var(--color-ink-muted)]">{ORTHO.registration}</p>
               <p className="body-large mt-5 max-w-xl text-[var(--color-ink-muted)]">
                 {ORTHO.credentials}. Team Doctor for Bengaluru Football Club. Dr Sunku directs clinical care at Physio Central, so every
                 treatment plan is built on an orthopaedic understanding of your problem.

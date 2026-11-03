@@ -31,6 +31,7 @@ const CREDENTIALS = [
       "MBBS, Rajarajeshwari Medical College & Hospital",
       "MS Orthopaedics (Gold Medalist), Bangalore Medical College & Research Institute",
       "Fellowship training in Arthroscopy, Joint Replacement & Sports Medicine",
+      "Registered with the Karnataka Medical Council, Reg. No. 117608",
     ],
   },
   {
@@ -138,6 +139,7 @@ export default async function AboutPage() {
               <p className="eyebrow">Clinical lead</p>
               <h2 id="doctor-h" className="headline-large mt-2 scroll-mt-28">{ORTHO.name}</h2>
               <p className="title-medium mt-2 text-[var(--color-ink-muted)]">Consultant orthopaedic surgeon · Arthroscopy, sports medicine &amp; joint replacement</p>
+              <p className="body-small mt-1 text-[var(--color-ink-muted)]">{ORTHO.registration}</p>
               <div className="prose-clinic body-large mt-6 space-y-4">
                 <p>
                   Dr Nitin Sunku is a fellowship-trained orthopaedic surgeon with more than 10 years of focused orthopaedic
