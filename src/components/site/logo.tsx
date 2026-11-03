@@ -12,9 +12,9 @@ export function Logo({ name = "Physio Central", inverted = false, size = 44 }: {
         <Image src="/brand/logo-mark.svg" alt="" width={Math.round(size * 0.82)} height={size} priority unoptimized />
       </span>
       <span className="flex flex-col">
-        <span className={`font-display text-[1.45rem] leading-none ${inverted ? "text-white" : "text-[var(--color-ink)]"}`}>{brand}</span>
+        <span className={`font-display whitespace-nowrap text-[1.45rem] leading-none ${inverted ? "text-white" : "text-[var(--color-ink)]"}`}>{brand}</span>
         {by ? (
-          <span className={`mt-1 text-[0.75rem] font-medium leading-none ${inverted ? "text-[var(--md-sys-color-inverse-on-surface-variant)]" : "text-[var(--color-ink-muted)]"}`}>by {by}</span>
+          <span className={`mt-1 whitespace-nowrap text-[0.75rem] font-medium leading-none ${inverted ? "text-[var(--md-sys-color-inverse-on-surface-variant)]" : "text-[var(--color-ink-muted)]"}`}>by {by}</span>
         ) : null}
       </span>
     </span>
