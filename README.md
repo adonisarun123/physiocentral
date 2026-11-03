@@ -55,3 +55,13 @@ Integration tests run against **real Postgres**. They cover UAT-01–05, 11–16
 ## Before launch (§24 owner decisions)
 
 Clinic legal identity and address, verified therapist profiles, approved service scope and prices, accountant-approved tax categories (taxed lines are blocked until then), policy text, booking rules, notification provider, and a backup/restore drill.
+
+## Deploying changes (order matters)
+
+Vercel deploys on every push to `main`. If a change adds database columns or tables:
+
+1. Run `npm run db:migrate` against production first (migrations are additive, so the live version keeps working).
+2. Then push the code.
+
+Pushing first causes errors until the migration lands. Clinic configuration (address, hours, clinician, service content) is
+loaded with `npx tsx scripts/clinic-setup.ts`, which is idempotent; edit `scripts/content/services.ts` and re-run it.
