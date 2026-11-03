@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { q } from "@/lib/db";
 import { getPublicBranches, getPublicServices } from "@/modules/content/public";
 import { BookingForm } from "./booking-form";
-import { todayInZone } from "@/lib/format";
+import { todayInZone, displayPhone } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -25,14 +25,21 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 
   if (bookable.length === 0 || branches.length === 0) {
     return (
-      <div className="mx-auto max-w-2xl px-4 py-10">
-        <span className="eyebrow">Book appointment</span>
-        <h1 className="display mt-4 text-[2.4rem] sm:text-[3.4rem]">Request an <em>appointment</em></h1>
-        <p className="prose-clinic mt-4">
-          Online requests open once the clinic has published its services. Until then, please {phone ? <>call <a href={`tel:${phone}`}>{phone}</a> or </> : null}
-          use the <Link href="/contact">contact page</Link>.
-        </p>
-      </div>
+      <section className="aurora grid-dots">
+        <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-24">
+          <span className="eyebrow">Book appointment</span>
+          <h1 className="display mt-5 text-[2.4rem] sm:text-[3.4rem]">Book by <em>phone</em></h1>
+          <p className="mx-auto mt-5 max-w-xl text-lg text-[var(--color-ink-muted)]">
+            Online booking is coming soon. Call the clinic and we&apos;ll find a time that suits you — for a clinic visit or a home visit.
+          </p>
+          {phone ? (
+            <a href={`tel:${phone}`} className="btn btn-primary mt-9 px-8 py-4 text-lg">Call {displayPhone(phone)}</a>
+          ) : (
+            <Link href="/contact" className="btn btn-primary mt-9 px-8 py-4 text-lg">Contact the clinic</Link>
+          )}
+          <p className="mt-6 text-sm text-[var(--color-ink-muted)]"><Link href="/services">See our services</Link></p>
+        </div>
+      </section>
     );
   }
 

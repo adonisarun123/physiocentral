@@ -30,3 +30,10 @@ export const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday",
 export function telHref(e164: string | null | undefined) {
   return e164 ? `tel:${e164}` : undefined;
 }
+
+/** Human display for Indian numbers: +917411174333 → +91 74111 74333. */
+export function displayPhone(e164: string | null | undefined): string {
+  if (!e164) return "";
+  const m = /^\+91(\d{5})(\d{5})$/.exec(e164);
+  return m ? `+91 ${m[1]} ${m[2]}` : e164;
+}

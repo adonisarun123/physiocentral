@@ -8,7 +8,7 @@ import {
 import { getOpeningHours, getPublicBranches, getPublicClinic, getPublicServices, getPublicTherapists } from "@/modules/content/public";
 import { JsonLd, clinicJsonLd } from "@/modules/content/schema";
 import { formatINR } from "@/modules/billing/money";
-import { WEEKDAYS, telHref } from "@/lib/format";
+import { WEEKDAYS, telHref, displayPhone } from "@/lib/format";
 import { BODY_AREAS } from "@/components/site/body-areas";
 import { Icon, iconForCategory } from "@/components/site/icon";
 import { AssessmentMock, EstimateMock, StatusMock } from "@/components/site/mocks";
@@ -22,7 +22,7 @@ const ACCENTS = [
   { bg: "bg-[var(--color-orange-soft)]", fg: "text-[var(--color-orange)]", ring: "group-hover:bg-[var(--color-logo-orange)]" },
 ];
 
-const MARQUEE = ["Back & neck pain", "Sports injuries", "Post-surgery rehab", "Knee & hip", "Shoulder pain", "Neurological rehab", "Balance & falls", "Posture & desk strain", "Ankle & foot", "Return to activity"];
+const MARQUEE = ["Joint pain & arthritis", "Fractures", "TKR & THR rehab", "Arthroscopy rehab", "Ligament & muscle injuries", "Neck & back pain", "Sciatica", "Posture care", "Mobility & balance", "Manual therapy", "Electrotherapy", "Home visits"];
 
 function SectionHead({ eyebrow, title, lead, center }: { eyebrow: string; title: React.ReactNode; lead?: string; center?: boolean }) {
   return (
@@ -40,7 +40,8 @@ export default async function HomePage() {
   const hours = branch ? await getOpeningHours(branch.id) : [];
   const name = clinic?.tradeName ?? "Physio Central";
   const verified = Boolean(clinic?.identityVerified && branch?.addressVerified);
-  const place = branch?.addressVerified ? [branch.locality, branch.city].filter(Boolean).join(", ") : null;
+  // Neighbourhood is safe to show before the full street address is verified.
+  const place = [branch?.locality, branch?.city].filter(Boolean).join(", ") || null;
   const ld = clinic && branch ? clinicJsonLd(clinic, branch, services) : null;
   const response = branch?.responseWindow ?? "within one working day";
   const bookingOpen = services.some((s) => s.bookable);
@@ -236,7 +237,7 @@ export default async function HomePage() {
                       <span className="font-display text-xl font-extrabold tracking-tight text-[var(--color-ink)]">{s.name}</span>
                       {s.summary ? <span className="text-[var(--color-ink-muted)]">{s.summary}</span> : null}
                       <span className="mt-auto flex flex-wrap gap-2 pt-2 text-sm">
-                        <span className="chip">{s.durationMinutes} min</span>
+                        {s.bookable ? <span className="chip">{s.durationMinutes} min</span> : null}
                         <span className="chip">{s.pricePaise ? formatINR(s.pricePaise) : "Fee after assessment"}</span>
                       </span>
                     </Link>
@@ -285,7 +286,7 @@ export default async function HomePage() {
             )}
             <div className="mt-8 flex flex-wrap gap-3">
               <Link href="/locations/main" className="btn btn-primary">Hours &amp; directions <ArrowRight size={16} aria-hidden="true" /></Link>
-              {branch?.phone ? <a href={telHref(branch.phone)} className="btn btn-ghost-light"><Phone size={16} aria-hidden="true" /> {branch.phone}</a> : null}
+              {branch?.phone ? <a href={telHref(branch.phone)} className="btn btn-ghost-light"><Phone size={16} aria-hidden="true" /> {displayPhone(branch.phone)}</a> : null}
             </div>
           </div>
           <div className="rounded-3xl border border-white/10 bg-white/5 p-7 backdrop-blur" data-reveal="120">

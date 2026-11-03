@@ -5,7 +5,7 @@ import { getOpeningHours, getPublicBranches, getPublicClinic, getPublicServices 
 import { JsonLd, clinicJsonLd } from "@/modules/content/schema";
 import { Notice } from "@/components/ui";
 import { PageHero } from "@/components/site/page-hero";
-import { WEEKDAYS, telHref } from "@/lib/format";
+import { WEEKDAYS, telHref, displayPhone } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +37,7 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
           {b.mapUrl ? <> · <a href={b.mapUrl} rel="noopener">Open in maps</a></> : null}
         </address>
       )}
-      {b.phone ? <p className="mt-2">Phone: <a href={telHref(b.phone)}>{b.phone}</a></p> : null}
+      {b.phone ? <p className="mt-2">Phone: <a href={telHref(b.phone)}>{displayPhone(b.phone)}</a></p> : null}
       <section className="mt-8">
         <h2 className="font-display text-2xl font-extrabold tracking-tight">Opening hours</h2>
         {hours.length === 0 ? <p className="mt-2 text-[var(--color-ink-muted)]">Hours will be published soon.</p> : (

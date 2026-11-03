@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Phone, CalendarCheck, Mail, MapPin } from "lucide-react";
 import { getPublicBranches, getPublicClinic } from "@/modules/content/public";
-import { telHref } from "@/lib/format";
+import { telHref, displayPhone } from "@/lib/format";
 import { Logo } from "@/components/site/logo";
 import { RevealRoot } from "@/components/site/reveal";
 
@@ -38,7 +38,7 @@ export default async function PublicLayout({ children }: { children: React.React
             </nav>
             <div className="flex items-center gap-2">
               {phone ? (
-                <a href={telHref(phone)} className="btn btn-secondary btn-sm hidden lg:inline-flex"><Phone size={16} aria-hidden="true" /> {phone}</a>
+                <a href={telHref(phone)} className="btn btn-secondary btn-sm hidden lg:inline-flex"><Phone size={16} aria-hidden="true" /> {displayPhone(phone)}</a>
               ) : null}
               <Link href="/book" className="btn btn-primary btn-sm hidden sm:inline-flex">Book appointment <ArrowRight size={16} aria-hidden="true" /></Link>
             </div>
@@ -71,7 +71,7 @@ export default async function PublicLayout({ children }: { children: React.React
           <div>
             <p className="font-display text-sm font-bold uppercase tracking-widest text-white/60">Contact</p>
             <ul className="mt-4 space-y-2.5 text-white/85">
-              <li className="flex items-center gap-2"><Phone size={16} aria-hidden="true" />{phone ? <a href={telHref(phone)} className="text-white/85 no-underline hover:text-white">{phone}</a> : "Coming soon"}</li>
+              <li className="flex items-center gap-2"><Phone size={16} aria-hidden="true" />{phone ? <a href={telHref(phone)} className="text-white/85 no-underline hover:text-white">{displayPhone(phone)}</a> : "Coming soon"}</li>
               {clinic?.email ? <li className="flex items-center gap-2"><Mail size={16} aria-hidden="true" /><a href={`mailto:${clinic.email}`} className="text-white/85 no-underline hover:text-white">{clinic.email}</a></li> : null}
               <li className="flex items-center gap-2"><MapPin size={16} aria-hidden="true" /><Link href="/locations/main" className="text-white/85 no-underline hover:text-white">Hours &amp; directions</Link></li>
             </ul>

@@ -47,18 +47,21 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
           ) : null)}
           <p className="mt-10 flex items-start gap-2 text-sm text-[var(--color-ink-muted)]">
             <ShieldCheck size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
-            Clinically reviewed by {s.clinicalReviewer}{s.reviewedOn ? ` on ${s.reviewedOn}` : ""}. General information, not a diagnosis.
+            Service listing confirmed by {s.clinicalReviewer}{s.reviewedOn ? ` on ${s.reviewedOn}` : ""}. General information, not a diagnosis.
           </p>
         </div>
         <aside className="card h-fit lg:sticky lg:top-28" aria-label="Booking summary">
           <dl className="space-y-3">
-            <div className="flex items-center gap-3"><Clock size={20} className="text-[var(--color-brand)]" aria-hidden="true" /><div><dt className="text-sm text-[var(--color-ink-muted)]">Approximate duration</dt><dd className="font-semibold">{s.durationMinutes} minutes</dd></div></div>
+            {s.bookable ? <div className="flex items-center gap-3"><Clock size={20} className="text-[var(--color-brand)]" aria-hidden="true" /><div><dt className="text-sm text-[var(--color-ink-muted)]">Approximate duration</dt><dd className="font-semibold">{s.durationMinutes} minutes</dd></div></div> : null}
             <div className="flex items-center gap-3"><IndianRupee size={20} className="text-[var(--color-brand)]" aria-hidden="true" /><div><dt className="text-sm text-[var(--color-ink-muted)]">Fee</dt><dd className="font-semibold">{fee}</dd></div></div>
           </dl>
           {s.bookable ? (
             <Link href={`/book?service=${s.id}`} className="btn btn-primary mt-5 w-full">Request this service <ArrowRight size={18} aria-hidden="true" /></Link>
           ) : (
-            <p className="mt-5 text-sm">Not available for online requests. Please <Link href="/contact">contact the clinic</Link>.</p>
+            <div className="mt-5">
+              <p className="text-sm text-[var(--color-ink-muted)]">Book this service by phone — the clinic will arrange the right time with you.</p>
+              <Link href="/contact" className="btn btn-primary mt-3 w-full">Call to book <ArrowRight size={18} aria-hidden="true" /></Link>
+            </div>
           )}
         </aside>
       </div>

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { getPublicBranches, getPublicClinic } from "@/modules/content/public";
-import { telHref } from "@/lib/format";
+import { telHref, displayPhone } from "@/lib/format";
 import { PageHero } from "@/components/site/page-hero";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +17,7 @@ export default async function ContactPage() {
         {branches.map((b) => (
           <div key={b.id}>
             <h2 className="font-display text-xl font-extrabold tracking-tight">{b.name}</h2>
-            {b.phone ? <p>Phone: <a href={telHref(b.phone)}>{b.phone}</a></p> : <p className="text-[var(--color-ink-muted)]">Phone number will be published soon.</p>}
+            {b.phone ? <p>Phone: <a href={telHref(b.phone)}>{displayPhone(b.phone)}</a></p> : <p className="text-[var(--color-ink-muted)]">Phone number will be published soon.</p>}
             <p><Link href={`/locations/${b.slug}`}>Address, hours and directions</Link></p>
           </div>
         ))}

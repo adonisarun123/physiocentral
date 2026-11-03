@@ -47,7 +47,7 @@ export default async function ServicesPage() {
                       <span className="font-display text-xl font-extrabold tracking-tight text-[var(--color-ink)]">{s.name}</span>
                       {s.summary ? <span className="text-[var(--color-ink-muted)]">{s.summary}</span> : null}
                       <span className="mt-auto flex flex-wrap gap-2 pt-2 text-sm">
-                        <span className="chip">About {s.durationMinutes} min</span>
+                        {s.bookable ? <span className="chip">About {s.durationMinutes} min</span> : <span className="chip">Call to book</span>}
                         <span className="chip">{s.pricePaise ? `${formatINR(s.pricePaise)} / ${s.billingUnit.toLowerCase()}` : (s.feePolicyText ?? "Fee after assessment")}</span>
                       </span>
                     </Link>
