@@ -225,7 +225,7 @@ export default async function HomePage() {
             </div>
           ) : (
             <ul className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {services.slice(0, 6).map((s, i) => {
+              {services.slice(0, 9).map((s, i) => {
                 const ac = ACCENTS[i % 3];
                 return (
                   <li key={s.id} data-reveal={String((i % 3) * 80)}>
