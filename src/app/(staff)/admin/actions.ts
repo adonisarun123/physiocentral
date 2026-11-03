@@ -11,6 +11,7 @@ import { addEstimateLine, createEstimate, decideEstimate, markEstimateLinePerfor
 import { createDirectInvoice, createDraftInvoice, discardDraftInvoice, issueInvoice } from "@/modules/billing/invoices";
 import { createPatient, updatePatient } from "@/modules/patients/admin";
 import { createStaffBooking } from "@/modules/scheduling/staff-booking";
+import { createStaffLogin, resetStaffPassword, setStaffActive, updateStaff } from "@/modules/staff/admin";
 import { allocatePayment, recordManualPayment, verifyPayment } from "@/modules/payments/manual";
 import { addPriceVersion, createService, setServiceStatus, updateServiceDetails } from "@/modules/catalog/admin";
 import { addTimeOff, createTherapist, removeTimeOff, setTherapistActive, setTherapistHours, setTherapistServices, shiftsFromForm, updateTherapistProfile } from "@/modules/clinic/team";
@@ -292,4 +293,34 @@ export async function directInvoiceAction(_: ActionResult, fd: FormData): Promis
   }, ["/admin/invoices", `/admin/patients/${s(fd, "patientId")}`]);
   if (res?.ok && id) redirect(`/admin/invoices/${id}`);
   return res;
+}
+
+// ───────────── Staff logins ─────────────
+export async function createStaffAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const r = await createStaffLogin(a, { name: s(fd, "name"), email: s(fd, "email"), roles: fd.getAll("role").map(String), therapistId: s(fd, "therapistId") || null }, cid);
+    return `Login created for ${r.email}. One-time password: ${r.tempPassword} — give it to them in person (not by WhatsApp/email). It is not shown again; they change it and turn on two-step verification at /admin/security.`;
+  }, ["/admin/staff"]);
+}
+
+export async function updateStaffAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    await updateStaff(a, { staffId: s(fd, "staffId"), name: s(fd, "name"), roles: fd.getAll("role").map(String), therapistId: s(fd, "therapistId") || null }, cid);
+    return "Saved. New permissions apply on their next page load.";
+  }, ["/admin/staff"]);
+}
+
+export async function staffActiveAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const active = s(fd, "active") === "true";
+    await setStaffActive(a, { staffId: s(fd, "staffId"), active }, cid);
+    return active ? "Login re-enabled." : "Login disabled and signed out everywhere.";
+  }, ["/admin/staff"]);
+}
+
+export async function resetStaffPasswordAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const r = await resetStaffPassword(a, s(fd, "staffId"), cid);
+    return `New one-time password: ${r.tempPassword} — give it to them in person. They have been signed out everywhere.`;
+  }, ["/admin/staff"]);
 }

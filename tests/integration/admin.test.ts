@@ -8,6 +8,8 @@ import { createPatient, searchPatients } from "@/modules/patients/admin";
 import { createStaffBooking } from "@/modules/scheduling/staff-booking";
 import { createDirectInvoice, issueInvoice } from "@/modules/billing/invoices";
 import { recordManualPayment } from "@/modules/payments/manual";
+import { setStaffActive, updateStaff, resetStaffPassword, tempPassword } from "@/modules/staff/admin";
+import { permissionsFor } from "@/modules/auth/permissions";
 import { buildFixture, resetDatabase, type Fixture } from "./helpers";
 
 let f: Fixture;
@@ -171,5 +173,31 @@ describe("front desk: patients, phone/walk-in booking, direct invoices, payments
     const funds = (await q1<{ unallocated_paise: string }>(`SELECT unallocated_paise::text FROM payment_funds WHERE payment_id=$1`, [r.paymentId]))!;
     expect(funds.unallocated_paise).toBe("500000");
     expect(r.receiptNumber).toBeTruthy();
+  });
+});
+
+describe("staff logins: lock-out guards", () => {
+  it("temporary passwords meet the 12+ character policy", () => {
+    const p = tempPassword();
+    expect(p).toMatch(/^[a-z2-9]{4}(-[a-z2-9]{4}){3}$/);
+  });
+
+  it("the only owner cannot be demoted or deactivated, and cannot deactivate or reset themselves", async () => {
+    const o = f.owner;
+    await expectCode(updateStaff(o, { staffId: o.staffId, name: "Owner", roles: ["CLINIC_ADMIN"] }, "t"), "VALIDATION");
+    await expectCode(setStaffActive(o, { staffId: o.staffId, active: false }, "t"), "VALIDATION");
+    await expectCode(resetStaffPassword(o, o.staffId, "t"), "VALIDATION");
+  });
+
+  it("a clinic admin given staff management still cannot grant Owner", async () => {
+    const admin = { ...f.receptionist, roles: ["CLINIC_ADMIN"], permissions: new Set([...permissionsFor(["CLINIC_ADMIN"]), "USERS_MANAGE" as const]) };
+    await expectCode(updateStaff(admin, { staffId: f.billing.staffId, name: "B", roles: ["BILLING", "OWNER"] }, "t"), "FORBIDDEN");
+    await expectCode(updateStaff(f.receptionist, { staffId: f.billing.staffId, name: "B", roles: ["BILLING"] }, "t"), "FORBIDDEN");
+  });
+
+  it("an owner can change another person's roles", async () => {
+    await updateStaff(f.owner, { staffId: f.billing.staffId, name: "Billing person", roles: ["BILLING", "RECEPTIONIST"] }, "t");
+    const r = await q1<{ roles: string[] }>(`SELECT array_agg(role ORDER BY role) roles FROM role_grant WHERE staff_member_id=$1`, [f.billing.staffId]);
+    expect(r!.roles).toEqual(["BILLING", "RECEPTIONIST"]);
   });
 });
