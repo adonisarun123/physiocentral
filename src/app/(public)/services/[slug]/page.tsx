@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { ArrowRight, Clock, IndianRupee, ShieldCheck } from "lucide-react";
 import { getPublicService } from "@/modules/content/public";
 import { formatINR } from "@/modules/billing/money";
 import { JsonLd, breadcrumbJsonLd } from "@/modules/content/schema";
@@ -21,32 +22,45 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
     ["What to expect", s.whatToExpect],
     ["Limitations", s.limitations],
   ];
+  const fee = s.pricePaise ? `${formatINR(s.pricePaise)} per ${s.billingUnit.toLowerCase()}` : (s.feePolicyText ?? "Confirmed after assessment");
   return (
-    <article className="mx-auto max-w-3xl px-4 py-10">
+    <article>
       <JsonLd data={breadcrumbJsonLd([{ name: "Services", path: "/services" }, { name: s.name, path: `/services/${s.slug}` }])} />
-      <nav aria-label="Breadcrumb" className="mb-4 text-sm">
-        <Link href="/services">Services</Link> <span aria-hidden="true">›</span> <span aria-current="page">{s.name}</span>
-      </nav>
-      <h1 className="text-3xl font-extrabold">{s.name}</h1>
-      {s.summary ? <p className="prose-clinic mt-3 text-lg">{s.summary}</p> : null}
-      <dl className="card mt-6 grid gap-3 sm:grid-cols-2">
-        <div><dt className="font-semibold">Approximate duration</dt><dd>{s.durationMinutes} minutes</dd></div>
-        <div><dt className="font-semibold">Fee</dt><dd>{s.pricePaise ? `${formatINR(s.pricePaise)} per ${s.billingUnit.toLowerCase()}` : (s.feePolicyText ?? "Confirmed after assessment")}</dd></div>
-      </dl>
-      {s.body ? <div className="prose-clinic mt-6 whitespace-pre-line">{s.body}</div> : null}
-      {sections.map(([h, body]) => body ? (
-        <section key={h} className="mt-6">
-          <h2 className="text-xl font-bold">{h}</h2>
-          <p className="prose-clinic mt-2 whitespace-pre-line">{body}</p>
-        </section>
-      ) : null)}
-      <p className="mt-6 text-sm text-[var(--color-ink-muted)]">
-        Clinically reviewed by {s.clinicalReviewer}{s.reviewedOn ? ` on ${s.reviewedOn}` : ""}. This page is general information, not a diagnosis.
-      </p>
-      <div className="mt-8 flex flex-wrap gap-3">
-        {s.bookable ? <Link href={`/book?service=${s.id}`} className="btn btn-primary">Request this service</Link> : (
-          <p>This service is not available for online requests. Please <Link href="/contact">contact the clinic</Link>.</p>
-        )}
+      <section className="border-b border-[var(--color-line)] bg-[var(--color-surface-alt)]">
+        <div className="mx-auto max-w-6xl px-4 py-12 sm:py-16">
+          <nav aria-label="Breadcrumb" className="mb-4 text-sm">
+            <Link href="/services">Services</Link> <span aria-hidden="true">›</span> <span aria-current="page">{s.name}</span>
+          </nav>
+          {s.category ? <span className="eyebrow">{s.category}</span> : null}
+          <h1 className="display mt-4 max-w-3xl text-[2.3rem] sm:text-[3rem]">{s.name}</h1>
+          {s.summary ? <p className="prose-clinic mt-4 text-lg text-[var(--color-ink-muted)]">{s.summary}</p> : null}
+        </div>
+      </section>
+      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 lg:grid-cols-[1fr_20rem]">
+        <div>
+          {s.body ? <div className="prose-clinic whitespace-pre-line text-lg">{s.body}</div> : null}
+          {sections.map(([h, body]) => body ? (
+            <section key={h} className="mt-8">
+              <h2 className="font-display text-2xl font-semibold">{h}</h2>
+              <p className="prose-clinic mt-2 whitespace-pre-line">{body}</p>
+            </section>
+          ) : null)}
+          <p className="mt-10 flex items-start gap-2 text-sm text-[var(--color-ink-muted)]">
+            <ShieldCheck size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
+            Clinically reviewed by {s.clinicalReviewer}{s.reviewedOn ? ` on ${s.reviewedOn}` : ""}. General information, not a diagnosis.
+          </p>
+        </div>
+        <aside className="card h-fit lg:sticky lg:top-28" aria-label="Booking summary">
+          <dl className="space-y-3">
+            <div className="flex items-center gap-3"><Clock size={20} className="text-[var(--color-brand)]" aria-hidden="true" /><div><dt className="text-sm text-[var(--color-ink-muted)]">Approximate duration</dt><dd className="font-semibold">{s.durationMinutes} minutes</dd></div></div>
+            <div className="flex items-center gap-3"><IndianRupee size={20} className="text-[var(--color-brand)]" aria-hidden="true" /><div><dt className="text-sm text-[var(--color-ink-muted)]">Fee</dt><dd className="font-semibold">{fee}</dd></div></div>
+          </dl>
+          {s.bookable ? (
+            <Link href={`/book?service=${s.id}`} className="btn btn-primary mt-5 w-full">Request this service <ArrowRight size={18} aria-hidden="true" /></Link>
+          ) : (
+            <p className="mt-5 text-sm">Not available for online requests. Please <Link href="/contact">contact the clinic</Link>.</p>
+          )}
+        </aside>
       </div>
     </article>
   );

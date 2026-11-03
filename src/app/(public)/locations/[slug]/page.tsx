@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { getOpeningHours, getPublicBranches, getPublicClinic, getPublicServices } from "@/modules/content/public";
 import { JsonLd, clinicJsonLd } from "@/modules/content/schema";
 import { Notice } from "@/components/ui";
+import { PageHero } from "@/components/site/page-hero";
 import { WEEKDAYS, telHref } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -24,9 +25,10 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
   const hours = await getOpeningHours(b.id);
   const ld = clinic ? clinicJsonLd(clinic, b, services) : null;
   return (
-    <div className="mx-auto max-w-4xl px-4 py-10">
-      {ld ? <JsonLd data={ld} /> : null}
-      <h1 className="text-3xl font-extrabold">{b.name}</h1>
+    <>
+    {ld ? <JsonLd data={ld} /> : null}
+    <PageHero eyebrow="Location" title={<>{b.name}</>} />
+    <div className="mx-auto max-w-4xl px-4 py-12">
       {!b.addressVerified ? (
         <div className="mt-4"><Notice tone="warn" title="Address being confirmed">The clinic&apos;s address, map and access details will be published once verified. Please call or use the contact page for directions.</Notice></div>
       ) : (
@@ -37,7 +39,7 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
       )}
       {b.phone ? <p className="mt-2">Phone: <a href={telHref(b.phone)}>{b.phone}</a></p> : null}
       <section className="mt-8">
-        <h2 className="text-xl font-bold">Opening hours</h2>
+        <h2 className="font-display text-2xl font-semibold">Opening hours</h2>
         {hours.length === 0 ? <p className="mt-2 text-[var(--color-ink-muted)]">Hours will be published soon.</p> : (
           <table className="data mt-2 max-w-md"><tbody>
             {WEEKDAYS.map((d, i) => {
@@ -48,8 +50,9 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
         )}
         <p className="mt-2 text-sm text-[var(--color-ink-muted)]">Times in {b.timezone === "Asia/Kolkata" ? "IST" : b.timezone}. Holiday closures are announced here.</p>
       </section>
-      {b.accessNotes ? <section className="mt-8"><h2 className="text-xl font-bold">Access and parking</h2><p className="mt-2 whitespace-pre-line">{b.accessNotes}</p></section> : null}
+      {b.accessNotes ? <section className="mt-8"><h2 className="font-display text-2xl font-semibold">Access and parking</h2><p className="mt-2 whitespace-pre-line">{b.accessNotes}</p></section> : null}
       <Link href="/book" className="btn btn-primary mt-8">Request an appointment</Link>
     </div>
+    </>
   );
 }

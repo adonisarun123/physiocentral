@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getPublicBranches, getPublicClinic } from "@/modules/content/public";
 import { telHref } from "@/lib/format";
+import { PageHero } from "@/components/site/page-hero";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Contact", description: "Phone, email, address and opening hours.", alternates: { canonical: "/contact" } };
@@ -9,12 +10,13 @@ export const metadata: Metadata = { title: "Contact", description: "Phone, email
 export default async function ContactPage() {
   const [clinic, branches] = await Promise.all([getPublicClinic(), getPublicBranches()]);
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-3xl font-extrabold">Contact</h1>
-      <div className="card mt-6 space-y-2">
+    <>
+    <PageHero eyebrow="Contact" title={<>Talk to <em>the clinic</em></>} lead="Call us, or send an appointment request online and we'll confirm a time with you." />
+    <div className="mx-auto max-w-3xl px-4 py-12">
+      <div className="card space-y-2">
         {branches.map((b) => (
           <div key={b.id}>
-            <h2 className="text-lg font-bold">{b.name}</h2>
+            <h2 className="font-display text-xl font-semibold">{b.name}</h2>
             {b.phone ? <p>Phone: <a href={telHref(b.phone)}>{b.phone}</a></p> : <p className="text-[var(--color-ink-muted)]">Phone number will be published soon.</p>}
             <p><Link href={`/locations/${b.slug}`}>Address, hours and directions</Link></p>
           </div>
@@ -26,5 +28,6 @@ export default async function ContactPage() {
         In an emergency, call 112.
       </p>
     </div>
+    </>
   );
 }

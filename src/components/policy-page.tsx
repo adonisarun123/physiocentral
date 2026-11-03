@@ -1,4 +1,5 @@
 import { Notice } from "@/components/ui";
+import { PageHero } from "@/components/site/page-hero";
 
 const SUMMARY: Record<string, string> = {
   privacy:
@@ -13,14 +14,14 @@ const SUMMARY: Record<string, string> = {
 /** Policy text is a DRAFT until approved by the clinic and its advisers (§24). */
 export function PolicyPage({ title, kind }: { title: string; kind: string }) {
   return (
-    <div className="mx-auto max-w-3xl px-4 py-10">
-      <h1 className="text-3xl font-extrabold">{title}</h1>
-      <div className="mt-6">
+    <>
+      <PageHero eyebrow="Policies" title={title} />
+      <div className="mx-auto max-w-3xl px-4 py-12">
         <Notice tone="warn" title="Draft — awaiting clinic approval">
           This page holds a plain-language summary. The approved policy text will replace it before launch.
         </Notice>
+        <p className="prose-clinic mt-6 text-lg">{SUMMARY[kind]}</p>
       </div>
-      <p className="prose-clinic mt-6">{SUMMARY[kind]}</p>
-    </div>
+    </>
   );
 }

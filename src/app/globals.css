@@ -1,16 +1,23 @@
 @import "tailwindcss";
 
-/* Design tokens (§4.3): calm clinical palette, AA contrast verified for text on surfaces. */
+/*
+ * Design tokens (§4.3). Visual language inspired by judge.me: two-tone serif
+ * display headings (navy + teal), mint call-to-action, pill eyebrows, soft
+ * gradient panels. All text pairs verified ≥ 4.5:1 (body) / ≥ 3:1 (large).
+ */
 @theme {
-  --color-ink: #13232f;          /* body text — 15.9:1 on white */
-  --color-ink-muted: #44545f;    /* secondary text — 7.9:1 on white */
+  --color-ink: #0f2f45;          /* navy — headings/body, 13.6:1 on white */
+  --color-ink-muted: #4a5d6b;    /* 6.6:1 on white */
   --color-surface: #ffffff;
-  --color-surface-alt: #f3f7f8;
-  --color-line: #c9d4d9;
-  --color-brand: #0b5d6b;        /* teal — 7.3:1 on white */
-  --color-brand-strong: #084652;
-  --color-brand-soft: #e3f1f3;
-  --color-accent: #8a4b08;       /* warm accent for CTAs on light bg — 6.6:1 */
+  --color-surface-alt: #f5f8fa;
+  --color-line: #dbe4ea;
+  --color-brand: #0e7c66;        /* teal accent text & links — 5.2:1 on white */
+  --color-brand-strong: #0a5c4c;
+  --color-brand-soft: #e6f6f0;
+  --color-mint: #7ee2b0;         /* CTA fill; navy text on mint = 9.4:1 */
+  --color-mint-strong: #5fd59b;
+  --color-sky: #d7ecfb;
+  --color-accent: #8a4b08;
   --color-ok: #1d6b37;
   --color-ok-soft: #e4f3e8;
   --color-warn: #7a5300;
@@ -18,11 +25,12 @@
   --color-danger: #a1261b;
   --color-danger-soft: #fbe9e7;
   --color-focus: #1a73e8;
-  --radius-card: 0.75rem;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Helvetica Neue", Arial, sans-serif;
+  --radius-card: 1rem;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif;
+  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
 }
 
-html { -webkit-text-size-adjust: 100%; }
+html { -webkit-text-size-adjust: 100%; scroll-padding-top: 6rem; scroll-padding-bottom: 5rem; }
 body {
   background: var(--color-surface);
   color: var(--color-ink);
@@ -30,49 +38,84 @@ body {
   line-height: 1.6;
 }
 
-/* Visible focus everywhere (WCAG 2.4.7 / 2.4.11) */
+@layer components {
+/* Display type: judge.me-style serif headings */
+.font-display, .display { font-family: var(--font-display); font-optical-sizing: auto; letter-spacing: -0.01em; }
+.display { font-weight: 600; line-height: 1.1; color: var(--color-ink); }
+.display em, .accent { font-style: normal; color: var(--color-brand); }
+
 :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
   outline: 3px solid var(--color-focus);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: 6px;
 }
-
-/* Sticky elements must not obscure focused controls */
-html { scroll-padding-top: 5rem; scroll-padding-bottom: 5rem; }
 
 .skip-link {
   position: absolute; left: 0.5rem; top: -4rem; z-index: 100;
-  background: var(--color-brand-strong); color: #fff; padding: 0.75rem 1rem; border-radius: 0.5rem;
+  background: var(--color-ink); color: #fff; padding: 0.75rem 1rem; border-radius: 0.5rem;
 }
 .skip-link:focus { top: 0.5rem; }
 
 .prose-clinic { max-width: 68ch; }
 .prose-clinic p + p { margin-top: 0.85rem; }
 
+/* Pill eyebrow (judge.me "Platform" / "Trusted by…") */
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  border: 1px solid var(--color-line); background: #fff; border-radius: 999px;
+  padding: 0.2rem 0.75rem; font-size: 0.85rem; font-weight: 500; color: var(--color-ink);
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 0.45rem; border: 1px solid var(--color-line);
+  background: #fff; border-radius: 999px; padding: 0.35rem 0.85rem; font-size: 0.9rem; color: var(--color-ink);
+}
+
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
-  min-height: 44px; padding: 0.55rem 1.1rem; border-radius: 0.6rem; font-weight: 600;
+  min-height: 44px; padding: 0.6rem 1.15rem; border-radius: 0.6rem; font-weight: 600;
   border: 2px solid transparent; cursor: pointer; text-decoration: none; line-height: 1.2;
+  transition: background-color .15s ease, border-color .15s ease, transform .15s ease;
 }
-.btn-primary { background: var(--color-brand); color: #fff; }
-.btn-primary:hover { background: var(--color-brand-strong); }
-.btn-secondary { background: #fff; color: var(--color-brand-strong); border-color: var(--color-brand); }
-.btn-secondary:hover { background: var(--color-brand-soft); }
+.btn-primary { background: var(--color-mint); color: var(--color-ink); }
+.btn-primary:hover { background: var(--color-mint-strong); }
+.btn-secondary { background: #fff; color: var(--color-ink); border-color: var(--color-line); }
+.btn-secondary:hover { border-color: var(--color-ink); }
+.btn-dark { background: var(--color-ink); color: #fff; }
+.btn-dark:hover { background: #0a2233; }
+.btn-link { padding-left: 0; padding-right: 0; color: var(--color-ink); background: none; }
+.btn-link:hover { color: var(--color-brand); }
 .btn-danger { background: #fff; color: var(--color-danger); border-color: var(--color-danger); }
 .btn-danger:hover { background: var(--color-danger-soft); }
 .btn:disabled, .btn[aria-disabled="true"] { opacity: 0.6; cursor: not-allowed; }
-.btn-sm { min-height: 36px; padding: 0.35rem 0.75rem; font-size: 0.9rem; }
+.btn-sm { min-height: 36px; padding: 0.35rem 0.8rem; font-size: 0.9rem; }
 
 .field-label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
 .field-hint { display: block; color: var(--color-ink-muted); font-size: 0.9rem; margin-bottom: 0.35rem; }
 .field-error { display: block; color: var(--color-danger); font-weight: 600; font-size: 0.95rem; margin-top: 0.25rem; }
 .input {
   width: 100%; min-height: 44px; padding: 0.5rem 0.75rem; border: 2px solid var(--color-line);
-  border-radius: 0.5rem; background: #fff; color: var(--color-ink); font-size: 1rem;
+  border-radius: 0.6rem; background: #fff; color: var(--color-ink); font-size: 1rem;
 }
+.input:hover { border-color: #b9c8d2; }
 .input[aria-invalid="true"] { border-color: var(--color-danger); }
 
 .card { background: #fff; border: 1px solid var(--color-line); border-radius: var(--radius-card); padding: 1.25rem; }
+.card-hover { transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.card-hover:hover { border-color: #b9c8d2; box-shadow: 0 10px 30px -18px rgba(15,47,69,.35); transform: translateY(-2px); }
+
+/* Soft gradient panels with fine diagonal hatch (judge.me feature art) */
+.panel-mint, .panel-sky {
+  position: relative; border-radius: 1.5rem; overflow: hidden;
+}
+.panel-mint { background: linear-gradient(160deg, #a9efcb 0%, #d9f8e8 100%); }
+.panel-sky { background: linear-gradient(160deg, #b9def6 0%, #e9f5fd 100%); }
+.panel-mint::before, .panel-sky::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: repeating-linear-gradient(135deg, rgba(255,255,255,.35) 0 1px, transparent 1px 9px);
+}
+.mock {
+  position: relative; background: #fff; border-radius: 1.25rem; box-shadow: 0 20px 45px -20px rgba(15,47,69,.45);
+}
 
 .badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.1rem 0.55rem; border-radius: 999px; font-size: 0.8rem; font-weight: 700; border: 1px solid currentColor; white-space: nowrap; }
 
@@ -81,6 +124,8 @@ table.data { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
 table.data th, table.data td { text-align: left; padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--color-line); vertical-align: top; }
 table.data th { font-weight: 700; color: var(--color-ink-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.02em; }
 table.data td.num, table.data th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }

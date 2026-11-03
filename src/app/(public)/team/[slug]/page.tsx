@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getPublicTherapist } from "@/modules/content/public";
 import { JsonLd, siteUrl } from "@/modules/content/schema";
+import { PageHero } from "@/components/site/page-hero";
 
 export const dynamic = "force-dynamic";
 
@@ -16,13 +17,15 @@ export default async function TherapistPage({ params }: { params: Promise<{ slug
   const t = await getPublicTherapist((await params).slug);
   if (!t) notFound();
   return (
-    <article className="mx-auto max-w-3xl px-4 py-10">
+    <article>
       <JsonLd data={{ "@context": "https://schema.org", "@type": "Person", name: t.displayName, jobTitle: t.designation, url: siteUrl(`/team/${t.slug}`) }} />
-      <h1 className="text-3xl font-extrabold">{t.displayName}</h1>
-      <p className="text-lg text-[var(--color-ink-muted)]">{t.designation}</p>
-      {t.bio ? <p className="prose-clinic mt-4 whitespace-pre-line">{t.bio}</p> : null}
-      {t.languages.length ? <p className="mt-4">Languages: {t.languages.join(", ")}</p> : null}
-      <Link href="/book" className="btn btn-primary mt-8">Request an appointment</Link>
+      <PageHero eyebrow="Our team" title={t.displayName} lead={t.designation}>
+        <Link href="/book" className="btn btn-primary">Request an appointment</Link>
+      </PageHero>
+      <div className="mx-auto max-w-6xl px-4 py-12">
+        {t.bio ? <p className="prose-clinic whitespace-pre-line text-lg">{t.bio}</p> : null}
+        {t.languages.length ? <p className="mt-6 flex flex-wrap items-center gap-2"><span className="font-semibold">Languages:</span> {t.languages.map((l) => <span key={l} className="chip">{l}</span>)}</p> : null}
+      </div>
     </article>
   );
 }
