@@ -3,15 +3,17 @@ import Image from "next/image";
 import type { Metadata } from "next";
 import {
   ArrowRight, ArrowUpRight, Clock, ShieldCheck, UserRound, CalendarCheck, MapPin, Phone, Plus, Send,
-  ClipboardCheck, Stethoscope, Repeat, Lock, Accessibility as AccessIcon, ListChecks,
+  ClipboardCheck, Stethoscope, Repeat, Lock, Accessibility as AccessIcon,
 } from "lucide-react";
 import { getOpeningHours, getPublicBranches, getPublicClinic, getPublicServices, getPublicTherapists } from "@/modules/content/public";
 import { JsonLd, clinicJsonLd } from "@/modules/content/schema";
 import { formatINR } from "@/modules/billing/money";
-import { WEEKDAYS, telHref, displayPhone } from "@/lib/format";
+import { WEEKDAYS, telHref, displayPhone, dayHours } from "@/lib/format";
 import { BODY_AREAS } from "@/components/site/body-areas";
 import { Icon, iconForCategory } from "@/components/site/icon";
 import { AssessmentMock, EstimateMock, StatusMock } from "@/components/site/mocks";
+import { HeroVisual, type HeroLiveData } from "@/components/site/hero-visual";
+import { nextAvailableLabel, openStatus } from "@/modules/content/live";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { alternates: { canonical: "/" } };
@@ -42,9 +44,19 @@ export default async function HomePage() {
   const verified = Boolean(clinic?.identityVerified && branch?.addressVerified);
   // Neighbourhood is safe to show before the full street address is verified.
   const place = [branch?.locality, branch?.city].filter(Boolean).join(", ") || null;
-  const ld = clinic && branch ? clinicJsonLd(clinic, branch, services) : null;
+  const ld = clinic && branch ? clinicJsonLd(clinic, branch, services, hours) : null;
   const response = branch?.responseWindow ?? "within one working day";
   const bookingOpen = services.some((s) => s.bookable);
+  const firstBookable = services.find((s) => s.bookable);
+  const [nextSlot, open] = branch
+    ? await Promise.all([firstBookable ? nextAvailableLabel(branch.id, firstBookable.id) : Promise.resolve(null), openStatus(branch.id)])
+    : [null, null];
+  const live: HeroLiveData = {
+    nextSlotLabel: nextSlot,
+    openLabel: open?.label ?? null,
+    openNow: open?.openNow ?? false,
+    place: branch?.addressVerified ? "Sector 2, HSR Layout" : place,
+  };
 
   return (
     <>
@@ -74,25 +86,7 @@ export default async function HomePage() {
             </ul>
           </div>
 
-          {/* Brand art: the runner mark on glass, with floating fact cards */}
-          <div className="relative mx-auto w-full max-w-md" data-reveal="150" aria-hidden="true">
-            <div className="glass relative aspect-[4/5] rounded-[2.5rem] p-10">
-              <div className="absolute inset-6 rounded-[2rem] bg-gradient-to-br from-[#e8f2fe] via-white to-[#e7f6e6]" />
-              <Image src="/brand/logo-mark.svg" alt="" fill unoptimized className="relative object-contain p-12" priority />
-            </div>
-            <div className="glass floaty absolute left-0 top-10 sm:-left-6 flex items-center gap-3 rounded-2xl px-4 py-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--color-brand)] text-white"><ClipboardCheck size={20} /></span>
-              <span><span className="block text-xs text-[var(--color-ink-muted)]">Step one</span><span className="font-display font-bold">Assessment first</span></span>
-            </div>
-            <div className="glass floaty-slow absolute right-0 top-1/2 sm:-right-4 flex items-center gap-3 rounded-2xl px-4 py-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--color-logo-green)] text-white"><ListChecks size={20} /></span>
-              <span><span className="block text-xs text-[var(--color-ink-muted)]">Your plan</span><span className="font-display font-bold">Agreed together</span></span>
-            </div>
-            <div className="glass floaty absolute -bottom-5 left-8 flex items-center gap-3 rounded-2xl px-4 py-3">
-              <span className="grid h-10 w-10 place-items-center rounded-xl bg-[var(--color-logo-orange)] text-white"><ShieldCheck size={20} /></span>
-              <span><span className="block text-xs text-[var(--color-ink-muted)]">Costs</span><span className="font-display font-bold">Approved by you</span></span>
-            </div>
-          </div>
+          <HeroVisual live={live} />
         </div>
       </section>
 
@@ -296,11 +290,11 @@ export default async function HomePage() {
             ) : (
               <dl className="mt-4 divide-y divide-white/10">
                 {WEEKDAYS.map((d, i) => {
-                  const h = hours.find((x) => x.weekday === i);
+                  const h = dayHours(hours, i);
                   return (
-                    <div key={d} className="flex justify-between py-2.5">
+                    <div key={d} className="flex justify-between gap-4 py-2.5">
                       <dt className="text-white/80">{d}</dt>
-                      <dd className={h ? "font-semibold" : "text-white/60"}>{h ? `${h.opens} – ${h.closes}` : "Closed"}</dd>
+                      <dd className={`text-right ${h ? "font-semibold" : "text-white/60"}`}>{h ?? "Closed"}</dd>
                     </div>
                   );
                 })}

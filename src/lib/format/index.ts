@@ -37,3 +37,15 @@ export function displayPhone(e164: string | null | undefined): string {
   const m = /^\+91(\d{5})(\d{5})$/.exec(e164);
   return m ? `+91 ${m[1]} ${m[2]}` : e164;
 }
+
+/** "16:00" → "4:00 pm" */
+export function time12(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
+}
+
+/** All opening intervals for a weekday, e.g. "9:00 am – 1:00 pm, 4:00 pm – 8:00 pm" or null when closed. */
+export function dayHours(hours: { weekday: number; opens: string; closes: string }[], weekday: number): string | null {
+  const list = hours.filter((h) => h.weekday === weekday);
+  return list.length ? list.map((h) => `${time12(h.opens)} – ${time12(h.closes)}`).join(", ") : null;
+}

@@ -9,7 +9,14 @@ export function siteUrl(path = ""): string {
   return `${(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000").replace(/\/$/, "")}${path}`;
 }
 
-export function clinicJsonLd(clinic: PublicClinic, branch: PublicBranch, services: PublicService[]) {
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+export function clinicJsonLd(
+  clinic: PublicClinic,
+  branch: PublicBranch,
+  services: PublicService[],
+  hours: { weekday: number; opens: string; closes: string }[] = [],
+) {
   if (!clinic.identityVerified || !branch.addressVerified || !branch.addressLine || !branch.phone) return null;
   const clinicId = siteUrl(`/locations/${branch.slug}#clinic`);
   const catalogId = siteUrl("/services#catalog");
@@ -29,6 +36,15 @@ export function clinicJsonLd(clinic: PublicClinic, branch: PublicBranch, service
       addressCountry: "IN",
     },
   };
+  if (branch.mapUrl) clinicNode.hasMap = branch.mapUrl;
+  if (hours.length) {
+    clinicNode.openingHoursSpecification = hours.map((h) => ({
+      "@type": "OpeningHoursSpecification",
+      dayOfWeek: `https://schema.org/${DAYS[h.weekday]}`,
+      opens: h.opens,
+      closes: h.closes,
+    }));
+  }
   if (branch.latitude && branch.longitude) {
     clinicNode.geo = { "@type": "GeoCoordinates", latitude: Number(branch.latitude), longitude: Number(branch.longitude) };
   }

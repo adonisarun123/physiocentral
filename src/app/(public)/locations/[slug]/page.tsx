@@ -5,7 +5,7 @@ import { getOpeningHours, getPublicBranches, getPublicClinic, getPublicServices 
 import { JsonLd, clinicJsonLd } from "@/modules/content/schema";
 import { Notice } from "@/components/ui";
 import { PageHero } from "@/components/site/page-hero";
-import { WEEKDAYS, telHref, displayPhone } from "@/lib/format";
+import { WEEKDAYS, telHref, displayPhone, dayHours } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +23,7 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
   const b = branches.find((x) => x.slug === slug);
   if (!b) notFound();
   const hours = await getOpeningHours(b.id);
-  const ld = clinic ? clinicJsonLd(clinic, b, services) : null;
+  const ld = clinic ? clinicJsonLd(clinic, b, services, hours) : null;
   return (
     <>
     {ld ? <JsonLd data={ld} /> : null}
@@ -43,8 +43,8 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
         {hours.length === 0 ? <p className="mt-2 text-[var(--color-ink-muted)]">Hours will be published soon.</p> : (
           <table className="data mt-2 max-w-md"><tbody>
             {WEEKDAYS.map((d, i) => {
-              const h = hours.find((x) => x.weekday === i);
-              return <tr key={d}><th scope="row">{d}</th><td>{h ? `${h.opens} – ${h.closes}` : "Closed"}</td></tr>;
+              const h = dayHours(hours, i);
+              return <tr key={d}><th scope="row" className="!normal-case !text-sm !tracking-normal">{d}</th><td>{h ?? "Closed"}</td></tr>;
             })}
           </tbody></table>
         )}

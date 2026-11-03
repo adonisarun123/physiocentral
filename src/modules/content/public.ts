@@ -43,8 +43,8 @@ export async function getPublicBranches(): Promise<PublicBranch[]> {
 
 export async function getOpeningHours(branchId: string) {
   return q<{ weekday: number; opens: string; closes: string }>(
-    `SELECT weekday, to_char(min(start_local),'HH24:MI') AS opens, to_char(max(end_local),'HH24:MI') AS closes
-       FROM availability_rule WHERE branch_id=$1 GROUP BY weekday ORDER BY weekday`,
+    `SELECT DISTINCT weekday, to_char(start_local,'HH24:MI') AS opens, to_char(end_local,'HH24:MI') AS closes
+       FROM availability_rule WHERE branch_id=$1 ORDER BY weekday, opens`,
     [branchId],
   );
 }
@@ -54,12 +54,14 @@ export interface PublicService {
   whoItMayHelp: string | null; whatToExpect: string | null; limitations: string | null; durationMinutes: number;
   billingUnit: string; feePolicyText: string | null; clinicalReviewer: string | null; reviewedOn: string | null;
   bookable: boolean; pricePaise: string | null;
+  headline: string | null; conditions: string[]; steps: { title: string; body: string }[]; faqs: { q: string; a: string }[];
+  seoTitle: string | null; seoDescription: string | null;
 }
 
 const SERVICE_SELECT = `
   SELECT s.id, s.slug, s.code, s.name, c.name AS category, s.summary, s.body, s.who_it_may_help, s.what_to_expect, s.limitations,
          s.duration_minutes, s.billing_unit, s.fee_policy_text, s.clinical_reviewer, to_char(s.reviewed_on,'YYYY-MM-DD') AS reviewed_on,
-         s.bookable, pv.unit_price_paise
+         s.bookable, pv.unit_price_paise, s.headline, s.conditions, s.session_steps, s.faqs, s.seo_title, s.seo_description, s.sort_order
     FROM service s
     LEFT JOIN service_category c ON c.id = s.category_id
     LEFT JOIN LATERAL (SELECT unit_price_paise FROM service_price_version p
@@ -74,11 +76,17 @@ function mapService(r: Record<string, unknown>): PublicService {
     durationMinutes: r.duration_minutes as number, billingUnit: r.billing_unit as string, feePolicyText: r.fee_policy_text as string | null,
     clinicalReviewer: r.clinical_reviewer as string | null, reviewedOn: r.reviewed_on as string | null, bookable: r.bookable as boolean,
     pricePaise: (r.unit_price_paise as string | null) ?? null,
+    headline: (r.headline as string | null) ?? null,
+    conditions: (r.conditions as string[] | null) ?? [],
+    steps: (r.session_steps as { title: string; body: string }[] | null) ?? [],
+    faqs: (r.faqs as { q: string; a: string }[] | null) ?? [],
+    seoTitle: (r.seo_title as string | null) ?? null,
+    seoDescription: (r.seo_description as string | null) ?? null,
   };
 }
 
 export async function getPublicServices(): Promise<PublicService[]> {
-  const rows = await q<Record<string, unknown>>(`${SERVICE_SELECT} ORDER BY c.sort_order NULLS LAST, s.name`);
+  const rows = await q<Record<string, unknown>>(`${SERVICE_SELECT} ORDER BY s.sort_order, c.sort_order NULLS LAST, s.name`);
   return rows.map(mapService);
 }
 

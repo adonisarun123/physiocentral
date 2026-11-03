@@ -183,3 +183,7 @@ body {
   .no-print { display: none !important; }
   body { background: #fff; }
 }
+
+@keyframes spin-slow { to { transform: translate(-50%, -50%) rotate(360deg); } }
+.spin-slow { animation: spin-slow 80s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .spin-slow { animation: none; } }
