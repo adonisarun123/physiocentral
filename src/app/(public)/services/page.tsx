@@ -29,7 +29,7 @@ export default async function ServicesPage() {
       >
         <Link href="/book" className="btn btn-primary">Not sure? Book an assessment <ArrowRight size={18} aria-hidden="true" /></Link>
       </PageHero>
-      <div className="mx-auto max-w-6xl px-4 py-12">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-12">
         {services.length === 0 ? (
           <div className="card max-w-2xl">
             <p className="font-semibold">Service descriptions are being reviewed by the clinic&apos;s clinical lead.</p>
@@ -43,8 +43,8 @@ export default async function ServicesPage() {
                 {list.map((s) => (
                   <li key={s.id}>
                     <Link href={`/services/${s.slug}`} className="card card-hover flex h-full flex-col gap-3 no-underline">
-                      <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--color-sky)] text-[var(--color-ink)]"><Icon name={iconForCategory(s.category)} size={22} /></span>
-                      <span className="font-display text-xl font-semibold text-[var(--color-ink)]">{s.name}</span>
+                      <span className="grid h-11 w-11 place-items-center rounded-xl bg-[var(--color-brand-soft)] text-[var(--color-brand)]"><Icon name={iconForCategory(s.category)} size={22} /></span>
+                      <span className="font-display text-xl font-extrabold tracking-tight text-[var(--color-ink)]">{s.name}</span>
                       {s.summary ? <span className="text-[var(--color-ink-muted)]">{s.summary}</span> : null}
                       <span className="mt-auto flex flex-wrap gap-2 pt-2 text-sm">
                         <span className="chip">About {s.durationMinutes} min</span>

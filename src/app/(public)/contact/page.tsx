@@ -16,7 +16,7 @@ export default async function ContactPage() {
       <div className="card space-y-2">
         {branches.map((b) => (
           <div key={b.id}>
-            <h2 className="font-display text-xl font-semibold">{b.name}</h2>
+            <h2 className="font-display text-xl font-extrabold tracking-tight">{b.name}</h2>
             {b.phone ? <p>Phone: <a href={telHref(b.phone)}>{b.phone}</a></p> : <p className="text-[var(--color-ink-muted)]">Phone number will be published soon.</p>}
             <p><Link href={`/locations/${b.slug}`}>Address, hours and directions</Link></p>
           </div>

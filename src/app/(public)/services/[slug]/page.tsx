@@ -26,13 +26,13 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
   return (
     <article>
       <JsonLd data={breadcrumbJsonLd([{ name: "Services", path: "/services" }, { name: s.name, path: `/services/${s.slug}` }])} />
-      <section className="border-b border-[var(--color-line)] bg-[var(--color-surface-alt)]">
-        <div className="mx-auto max-w-6xl px-4 py-12 sm:py-16">
+      <section className="aurora grid-dots border-b border-[var(--color-line)]">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-16">
           <nav aria-label="Breadcrumb" className="mb-4 text-sm">
             <Link href="/services">Services</Link> <span aria-hidden="true">›</span> <span aria-current="page">{s.name}</span>
           </nav>
           {s.category ? <span className="eyebrow">{s.category}</span> : null}
-          <h1 className="display mt-4 max-w-3xl text-[2.3rem] sm:text-[3rem]">{s.name}</h1>
+          <h1 className="display mt-5 max-w-4xl text-[2.4rem] sm:text-[3.6rem]">{s.name}</h1>
           {s.summary ? <p className="prose-clinic mt-4 text-lg text-[var(--color-ink-muted)]">{s.summary}</p> : null}
         </div>
       </section>
@@ -41,7 +41,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
           {s.body ? <div className="prose-clinic whitespace-pre-line text-lg">{s.body}</div> : null}
           {sections.map(([h, body]) => body ? (
             <section key={h} className="mt-8">
-              <h2 className="font-display text-2xl font-semibold">{h}</h2>
+              <h2 className="font-display text-2xl font-extrabold tracking-tight">{h}</h2>
               <p className="prose-clinic mt-2 whitespace-pre-line">{body}</p>
             </section>
           ) : null)}

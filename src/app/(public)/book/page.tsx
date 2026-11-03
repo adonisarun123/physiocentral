@@ -27,7 +27,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
     return (
       <div className="mx-auto max-w-2xl px-4 py-10">
         <span className="eyebrow">Book appointment</span>
-        <h1 className="display mt-4 text-[2.2rem] sm:text-[2.8rem]">Request an <em>appointment</em></h1>
+        <h1 className="display mt-4 text-[2.4rem] sm:text-[3.4rem]">Request an <em>appointment</em></h1>
         <p className="prose-clinic mt-4">
           Online requests open once the clinic has published its services. Until then, please {phone ? <>call <a href={`tel:${phone}`}>{phone}</a> or </> : null}
           use the <Link href="/contact">contact page</Link>.
@@ -39,7 +39,7 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   return (
     <div className="mx-auto max-w-5xl px-4 py-10">
       <span className="eyebrow">Book appointment</span>
-      <h1 className="display mt-4 text-[2.2rem] sm:text-[2.8rem]">Request an <em>appointment</em></h1>
+      <h1 className="display mt-4 text-[2.4rem] sm:text-[3.4rem]">Request an <em>appointment</em></h1>
       <p className="prose-clinic mt-3 text-lg text-[var(--color-ink-muted)]">
         Takes about 2 minutes. You don&apos;t need an account. Your request is <strong>pending until the clinic confirms it</strong>.
       </p>

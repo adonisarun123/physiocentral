@@ -39,7 +39,7 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
       )}
       {b.phone ? <p className="mt-2">Phone: <a href={telHref(b.phone)}>{b.phone}</a></p> : null}
       <section className="mt-8">
-        <h2 className="font-display text-2xl font-semibold">Opening hours</h2>
+        <h2 className="font-display text-2xl font-extrabold tracking-tight">Opening hours</h2>
         {hours.length === 0 ? <p className="mt-2 text-[var(--color-ink-muted)]">Hours will be published soon.</p> : (
           <table className="data mt-2 max-w-md"><tbody>
             {WEEKDAYS.map((d, i) => {
@@ -50,7 +50,7 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
         )}
         <p className="mt-2 text-sm text-[var(--color-ink-muted)]">Times in {b.timezone === "Asia/Kolkata" ? "IST" : b.timezone}. Holiday closures are announced here.</p>
       </section>
-      {b.accessNotes ? <section className="mt-8"><h2 className="font-display text-2xl font-semibold">Access and parking</h2><p className="mt-2 whitespace-pre-line">{b.accessNotes}</p></section> : null}
+      {b.accessNotes ? <section className="mt-8"><h2 className="font-display text-2xl font-extrabold tracking-tight">Access and parking</h2><p className="mt-2 whitespace-pre-line">{b.accessNotes}</p></section> : null}
       <Link href="/book" className="btn btn-primary mt-8">Request an appointment</Link>
     </div>
     </>
