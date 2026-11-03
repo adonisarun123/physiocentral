@@ -25,17 +25,17 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
 
   if (bookable.length === 0 || branches.length === 0) {
     return (
-      <section className="aurora grid-dots">
-        <div className="mx-auto max-w-3xl px-4 py-16 text-center sm:px-6 sm:py-24">
-          <span className="eyebrow">Book appointment</span>
-          <h1 className="display mt-5 text-[2.4rem] sm:text-[3.4rem]">Book by <em>phone</em></h1>
-          <p className="mx-auto mt-5 max-w-xl text-lg text-[var(--color-ink-muted)]">
+      <section className="bg-[var(--md-sys-color-surface-container-low)]">
+        <div className="wrap max-w-3xl py-16 text-center sm:py-24">
+          <p className="eyebrow">Book appointment</p>
+          <h1 className="display-medium mt-3">Book by phone</h1>
+          <p className="body-large mx-auto mt-5 max-w-xl text-[var(--color-ink-muted)]">
             Online booking is coming soon. Call the clinic and we&apos;ll find a time that suits you — for a clinic visit or a home visit.
           </p>
           {phone ? (
-            <a href={`tel:${phone}`} className="btn btn-primary mt-9 px-8 py-4 text-lg">Call {displayPhone(phone)}</a>
+            <a href={`tel:${phone}`} className="btn btn-primary mt-9">Call {displayPhone(phone)}</a>
           ) : (
-            <Link href="/contact" className="btn btn-primary mt-9 px-8 py-4 text-lg">Contact the clinic</Link>
+            <Link href="/contact" className="btn btn-primary mt-9">Contact the clinic</Link>
           )}
           <p className="mt-6 text-sm text-[var(--color-ink-muted)]"><Link href="/services">See our services</Link></p>
         </div>
@@ -44,10 +44,11 @@ export default async function BookPage({ searchParams }: { searchParams: Promise
   }
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-10">
-      <span className="eyebrow">Book appointment</span>
-      <h1 className="display mt-4 text-[2.4rem] sm:text-[3.4rem]">Request an <em>appointment</em></h1>
-      <p className="prose-clinic mt-3 text-lg text-[var(--color-ink-muted)]">
+    <div className="wrap max-w-5xl py-12">
+      <span className="brand-rule" aria-hidden="true"><i /><i /><i /></span>
+      <p className="eyebrow mt-5">Book appointment</p>
+      <h1 className="display-medium mt-3">Request an appointment</h1>
+      <p className="body-large prose-clinic mt-4 text-[var(--color-ink-muted)]">
         Takes about 2 minutes. You don&apos;t need an account. Your request is <strong>pending until the clinic confirms it</strong>.
       </p>
       <BookingForm

@@ -2,18 +2,19 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 
-// Self-hosted variable fonts (no third-party font requests; §21.1).
-const jakarta = localFont({
-  src: "../../node_modules/@fontsource-variable/plus-jakarta-sans/files/plus-jakarta-sans-latin-wght-normal.woff2",
-  variable: "--font-jakarta",
+// Self-hosted fonts (no third-party font requests; §21.1). DM Serif Display for
+// M3 display/headline roles, DM Sans for title/body/label roles.
+const dmSerif = localFont({
+  src: "../../node_modules/@fontsource/dm-serif-display/files/dm-serif-display-latin-400-normal.woff2",
+  variable: "--font-dm-serif",
   display: "swap",
-  weight: "200 800",
+  weight: "400",
 });
-const inter = localFont({
-  src: "../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2",
-  variable: "--font-inter",
+const dmSans = localFont({
+  src: "../../node_modules/@fontsource-variable/dm-sans/files/dm-sans-latin-wght-normal.woff2",
+  variable: "--font-dm-sans",
   display: "swap",
-  weight: "100 900",
+  weight: "100 1000",
 });
 
 export const metadata: Metadata = {
@@ -27,12 +28,12 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0066d6",
+  themeColor: "#002552",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en-IN" className={`${jakarta.variable} ${inter.variable}`}>
+    <html lang="en-IN" className={`${dmSerif.variable} ${dmSans.variable}`}>
       <body className="min-h-screen antialiased">
         <a href="#main" className="skip-link">Skip to main content</a>
         {children}

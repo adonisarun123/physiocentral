@@ -16,11 +16,11 @@ export function PolicyPage({ title, kind }: { title: string; kind: string }) {
   return (
     <>
       <PageHero eyebrow="Policies" title={title} />
-      <div className="mx-auto max-w-3xl px-4 py-12">
+      <div className="wrap section max-w-3xl">
         <Notice tone="warn" title="Draft — awaiting clinic approval">
           This page holds a plain-language summary. The approved policy text will replace it before launch.
         </Notice>
-        <p className="prose-clinic mt-6 text-lg">{SUMMARY[kind]}</p>
+        <p className="body-large prose-clinic mt-8">{SUMMARY[kind]}</p>
       </div>
     </>
   );

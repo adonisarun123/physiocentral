@@ -27,31 +27,36 @@ export default async function LocationPage({ params }: { params: Promise<{ slug:
   return (
     <>
     {ld ? <JsonLd data={ld} /> : null}
-    <PageHero eyebrow="Location" title={<>{b.name}</>} />
-    <div className="mx-auto max-w-4xl px-4 py-12">
-      {!b.addressVerified ? (
-        <div className="mt-4"><Notice tone="warn" title="Address being confirmed">The clinic&apos;s address, map and access details will be published once verified. Please call or use the contact page for directions.</Notice></div>
-      ) : (
-        <address className="mt-4 not-italic">
-          {[b.addressLine, b.locality, b.city, b.region, b.postalCode].filter(Boolean).join(", ")}
-          {b.mapUrl ? <> · <a href={b.mapUrl} rel="noopener">Open in maps</a></> : null}
-        </address>
-      )}
-      {b.phone ? <p className="mt-2">Phone: <a href={telHref(b.phone)}>{displayPhone(b.phone)}</a></p> : null}
-      <section className="mt-8">
-        <h2 className="font-display text-2xl font-extrabold tracking-tight">Opening hours</h2>
-        {hours.length === 0 ? <p className="mt-2 text-[var(--color-ink-muted)]">Hours will be published soon.</p> : (
-          <table className="data mt-2 max-w-md"><tbody>
-            {WEEKDAYS.map((d, i) => {
-              const h = dayHours(hours, i);
-              return <tr key={d}><th scope="row" className="!normal-case !text-sm !tracking-normal">{d}</th><td>{h ?? "Closed"}</td></tr>;
-            })}
-          </tbody></table>
+    <PageHero eyebrow="Visit us" title={b.name} lead={b.addressVerified ? `${b.locality ?? ""}${b.city ? `, ${b.city}` : ""}` : undefined} />
+    <div className="wrap section grid gap-12 lg:grid-cols-[1.1fr_0.9fr]">
+      <div>
+        {!b.addressVerified ? (
+          <Notice tone="warn" title="Address being confirmed">The clinic&apos;s address, map and access details will be published once verified. Please call or use the contact page for directions.</Notice>
+        ) : (
+          <>
+            <h2 className="headline-large">Find us</h2>
+            <address className="body-large mt-4 max-w-md not-italic">{[b.addressLine, b.locality, b.city, b.region, b.postalCode].filter(Boolean).join(", ")}</address>
+          </>
         )}
-        <p className="mt-2 text-sm text-[var(--color-ink-muted)]">Times in {b.timezone === "Asia/Kolkata" ? "IST" : b.timezone}. Holiday closures are announced here.</p>
+        {b.accessNotes ? <div className="card-filled mt-8"><h3 className="title-large">Access and parking</h3><p className="body-medium mt-2 whitespace-pre-line">{b.accessNotes}</p></div> : null}
+        <div className="mt-8 flex flex-wrap gap-3">
+          {b.mapUrl ? <a href={b.mapUrl} rel="noopener" className="btn btn-primary">Open in Maps</a> : null}
+          {b.phone ? <a href={telHref(b.phone)} className="btn btn-secondary">Call {displayPhone(b.phone)}</a> : null}
+          <Link href="/book" className="btn btn-text">Request appointment</Link>
+        </div>
+      </div>
+      <section className="band on-band h-fit rounded-[var(--md-sys-shape-xl)] p-8 sm:p-10" aria-labelledby="hours-h">
+        <h2 id="hours-h" className="headline-medium">Opening hours</h2>
+        {hours.length === 0 ? <p className="muted mt-3">Hours will be published soon.</p> : (
+          <dl className="mt-6 divide-y divide-white/15">
+            {[1, 2, 3, 4, 5, 6, 0].map((i) => {
+              const h = dayHours(hours, i);
+              return <div key={i} className="flex justify-between gap-4 py-3"><dt className="muted">{WEEKDAYS[i]}</dt><dd className={h ? "text-right text-white" : "muted"}>{h ?? "Closed"}</dd></div>;
+            })}
+          </dl>
+        )}
+        <p className="body-small muted mt-5">Times in {b.timezone === "Asia/Kolkata" ? "IST" : b.timezone}. Holiday closures are announced here.</p>
       </section>
-      {b.accessNotes ? <section className="mt-8"><h2 className="font-display text-2xl font-extrabold tracking-tight">Access and parking</h2><p className="mt-2 whitespace-pre-line">{b.accessNotes}</p></section> : null}
-      <Link href="/book" className="btn btn-primary mt-8">Request an appointment</Link>
     </div>
     </>
   );

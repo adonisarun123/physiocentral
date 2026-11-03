@@ -20,11 +20,11 @@ export default async function TherapistPage({ params }: { params: Promise<{ slug
     <article>
       <JsonLd data={{ "@context": "https://schema.org", "@type": "Person", name: t.displayName, jobTitle: t.designation, url: siteUrl(`/team/${t.slug}`) }} />
       <PageHero eyebrow="Our team" title={t.displayName} lead={t.designation}>
-        <Link href="/book" className="btn btn-primary">Request an appointment</Link>
+        <Link href="/book" className="btn btn-primary">Request appointment</Link>
       </PageHero>
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-12">
-        {t.bio ? <p className="prose-clinic whitespace-pre-line text-lg">{t.bio}</p> : null}
-        {t.languages.length ? <p className="mt-6 flex flex-wrap items-center gap-2"><span className="font-semibold">Languages:</span> {t.languages.map((l) => <span key={l} className="chip">{l}</span>)}</p> : null}
+      <div className="wrap section">
+        {t.bio ? <p className="body-large prose-clinic whitespace-pre-line">{t.bio}</p> : null}
+        {t.languages.length ? <p className="mt-6 flex flex-wrap items-center gap-2"><span className="title-small">Languages:</span> {t.languages.map((l) => <span key={l} className="chip">{l}</span>)}</p> : null}
       </div>
     </article>
   );

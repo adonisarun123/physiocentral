@@ -55,3 +55,20 @@ export function dayHours(hours: { weekday: number; opens: string; closes: string
   }
   return list.length ? list.map((h) => `${time12(h.opens)} – ${time12(h.closes)}`).join(", ") : null;
 }
+
+/** Group consecutive weekdays (Mon→Sun) with identical hours: [{days:"Mon – Sat", hours:"9:00 am – 1:00 pm, 4:00 pm – 8:00 pm"}, {days:"Sunday", hours:"Closed"}]. */
+export function groupHours(hours: { weekday: number; opens: string; closes: string }[]) {
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const out: { days: string; hours: string }[] = [];
+  let start = 0;
+  for (let i = 1; i <= order.length; i++) {
+    const prev = dayHours(hours, order[i - 1]) ?? "Closed";
+    const cur = i < order.length ? dayHours(hours, order[i]) ?? "Closed" : null;
+    if (cur !== prev) {
+      const a = WEEKDAYS[order[start]], b = WEEKDAYS[order[i - 1]];
+      out.push({ days: start === i - 1 ? a : `${a.slice(0, 3)} – ${b.slice(0, 3)}`, hours: prev });
+      start = i;
+    }
+  }
+  return out;
+}
