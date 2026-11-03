@@ -16,7 +16,8 @@ export class DomainError extends Error {
       | "ALREADY_BILLED"
       | "INSUFFICIENT_FUNDS"
       | "FEATURE_DISABLED"
-      | "RATE_LIMITED",
+      | "RATE_LIMITED"
+      | "DUPLICATE",
     message: string,
     public fieldErrors?: Record<string, string>,
   ) {

@@ -15,6 +15,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin", label: "Dashboard", show: true },
     { href: "/admin/requests", label: "Request inbox", show: can(actor, "APPOINTMENT_VIEW") },
     { href: "/admin/calendar", label: "Calendar", show: can(actor, "APPOINTMENT_VIEW") },
+    { href: "/admin/book", label: "+ New booking", show: can(actor, "APPOINTMENT_ACCEPT") },
+    { href: "/admin/patients", label: "Patients", show: can(actor, "PATIENT_CONTACT_VIEW") },
     { href: "/admin/invoices", label: "Invoices", show: can(actor, "INVOICE_DRAFT") || can(actor, "FINANCE_VIEW") },
     { href: "/admin/payments", label: "Payments", show: can(actor, "PAYMENT_RECORD") || can(actor, "PAYMENT_VERIFY") },
     { href: "/admin/catalog", label: "Service catalog", show: can(actor, "CATALOG_MANAGE") || can(actor, "PRICE_MANAGE") },

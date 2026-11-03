@@ -37,6 +37,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         <Link className="btn btn-secondary btn-sm" href={`/admin/calendar?date=${shift(date, -1)}`}>← Previous day</Link>
         <Link className="btn btn-secondary btn-sm" href="/admin/calendar">Today</Link>
         <Link className="btn btn-secondary btn-sm" href={`/admin/calendar?date=${shift(date, 1)}`}>Next day →</Link>
+        <Link className="btn btn-primary btn-sm" href="/admin/book">+ New booking</Link>
       </PageHeader>
       <form className="mb-6 flex items-end gap-2" action="/admin/calendar">
         <div><label htmlFor="date" className="field-label">Go to date</label><input id="date" name="date" type="date" defaultValue={date} className="input" /></div>

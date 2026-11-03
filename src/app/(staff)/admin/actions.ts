@@ -8,7 +8,9 @@ import type { StaffActor } from "@/modules/auth/actor";
 import type { ActionResult } from "@/components/action-form";
 import { acceptAppointment, cancelAppointment, rejectAppointment, transitionAppointment, type TransitionName } from "@/modules/scheduling/appointments";
 import { addEstimateLine, createEstimate, decideEstimate, markEstimateLinePerformed, removeEstimateLine, reviseEstimate, sendEstimateVersion } from "@/modules/billing/estimates";
-import { createDraftInvoice, discardDraftInvoice, issueInvoice } from "@/modules/billing/invoices";
+import { createDirectInvoice, createDraftInvoice, discardDraftInvoice, issueInvoice } from "@/modules/billing/invoices";
+import { createPatient, updatePatient } from "@/modules/patients/admin";
+import { createStaffBooking } from "@/modules/scheduling/staff-booking";
 import { allocatePayment, recordManualPayment, verifyPayment } from "@/modules/payments/manual";
 import { addPriceVersion, createService, setServiceStatus, updateServiceDetails } from "@/modules/catalog/admin";
 import { addTimeOff, createTherapist, removeTimeOff, setTherapistActive, setTherapistHours, setTherapistServices, shiftsFromForm, updateTherapistProfile } from "@/modules/clinic/team";
@@ -130,7 +132,7 @@ export async function recordPaymentAction(_: ActionResult, fd: FormData) {
       intendedInvoiceId: s(fd, "invoiceId") || undefined, verifyNow: fd.get("verifyNow") === "on",
     }, cid);
     return r.receiptNumber ? `Payment verified. Receipt ${r.receiptNumber}.` : "Payment recorded as PENDING verification.";
-  }, [`/admin/invoices/${s(fd, "invoiceId")}`, "/admin/payments"]);
+  }, [`/admin/invoices/${s(fd, "invoiceId")}`, "/admin/payments", `/admin/patients/${s(fd, "patientId")}`]);
 }
 
 export async function verifyPaymentAction(_: ActionResult, fd: FormData) {
@@ -238,4 +240,56 @@ export async function addTimeOffAction(_: ActionResult, fd: FormData) {
 export async function removeTimeOffAction(_: ActionResult, fd: FormData) {
   return run(async (a, cid) => { await removeTimeOff(a, s(fd, "id"), cid); return "Removed. Those times are open again."; },
     ["/admin/schedule", `/admin/team/${s(fd, "therapistId")}`, "/book"]);
+}
+
+// ───────────── Patients, staff booking, direct invoices ─────────────
+/** Only allow redirects back into the admin area. */
+const safeNext = (v: string) => (/^\/admin\/[a-z/-]*(\?[\w=&%-]*)?$/i.test(v) ? v : "");
+
+export async function createPatientAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  let id: string | null = null;
+  const res = await run(async (a, cid) => {
+    const r = await createPatient(a, { fullName: s(fd, "fullName"), phone: s(fd, "phone"), email: s(fd, "email"), isNewPatient: true, allowDuplicate: fd.get("allowDuplicate") === "on" }, cid);
+    id = r.patientId;
+  }, ["/admin/patients"]);
+  if (res?.ok && id) {
+    const next = safeNext(s(fd, "next"));
+    redirect(next ? `${next}${next.includes("?") ? "&" : "?"}patient=${id}` : `/admin/patients/${id}`);
+  }
+  return res;
+}
+
+export async function updatePatientAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    await updatePatient(a, { patientId: s(fd, "patientId"), fullName: s(fd, "fullName"), phone: s(fd, "phone"), email: s(fd, "email") }, cid);
+    return "Patient details saved.";
+  }, [`/admin/patients/${s(fd, "patientId")}`, "/admin/patients"]);
+}
+
+export async function staffBookAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  let id: string | null = null;
+  const res = await run(async (a, cid) => {
+    const r = await createStaffBooking(a, {
+      patientId: s(fd, "patientId"), serviceId: s(fd, "serviceId"), therapistId: s(fd, "therapistId") || null,
+      startsAt: s(fd, "startsAt"), source: s(fd, "source") === "WALK_IN" ? "WALK_IN" : "PHONE", reason: s(fd, "reason"),
+    }, cid);
+    id = r.appointmentId;
+  }, ["/admin", "/admin/calendar", `/admin/patients/${s(fd, "patientId")}`]);
+  if (res?.ok && id) redirect(`/admin/appointments/${id}?booked=1`);
+  return res;
+}
+
+export async function directInvoiceAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  let id: string | null = null;
+  const res = await run(async (a, cid) => {
+    const count = Math.min(n(fd, "lineCount") || 0, 20);
+    const lines = Array.from({ length: count }, (_, i) => ({
+      serviceId: s(fd, `l${i}service`) || null, description: s(fd, `l${i}desc`), quantity: s(fd, `l${i}qty`),
+      unitPriceRupees: s(fd, `l${i}price`), discountRupees: s(fd, `l${i}disc`),
+    }));
+    const r = await createDirectInvoice(a, { patientId: s(fd, "patientId"), lines }, cid);
+    id = r.invoiceId;
+  }, ["/admin/invoices", `/admin/patients/${s(fd, "patientId")}`]);
+  if (res?.ok && id) redirect(`/admin/invoices/${id}`);
+  return res;
 }

@@ -32,7 +32,11 @@ export default async function Dashboard() {
 
   return (
     <>
-      <PageHeader title="Dashboard" lead={`Welcome, ${actor.displayName}.`} />
+      <PageHeader title="Dashboard" lead={`Welcome, ${actor.displayName}.`}>
+        {actor.permissions.has("APPOINTMENT_ACCEPT") ? <Link href="/admin/book" className="btn btn-primary">+ New booking</Link> : null}
+        {actor.permissions.has("INVOICE_DRAFT") ? <Link href="/admin/invoices/new" className="btn btn-secondary">New invoice</Link> : null}
+        {actor.permissions.has("PAYMENT_RECORD") ? <Link href="/admin/payments/new" className="btn btn-secondary">Record payment</Link> : null}
+      </PageHeader>
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Link href="/admin/requests" className="card no-underline">
           <p className="text-sm font-semibold text-[var(--color-ink-muted)]">Pending requests</p>

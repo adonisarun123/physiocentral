@@ -1,8 +1,8 @@
 import { tx, q, q1, pgErrorCode, pgConstraint, type Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { audit, enqueue } from "@/modules/audit";
-import { assertPermission, type Actor } from "@/modules/auth/actor";
-import { computeLine, financialYear, parseQuantityMilli, sumLines, ROUNDING_POLICY } from "./money";
+import { assertPermission, type Actor, type StaffActor } from "@/modules/auth/actor";
+import { computeLine, financialYear, formatQuantity, parseQuantityMilli, parseRupeesToPaise, sumLines, ROUNDING_POLICY } from "./money";
 
 export const RENDERER_VERSION = "html-print-v1";
 
@@ -19,52 +19,124 @@ export async function createDraftInvoice(
   assertPermission(actor, "INVOICE_DRAFT");
   if (input.chargeIds.length === 0) throw new DomainError("VALIDATION", "Select at least one charge.");
   try {
-    return await tx(async (db) => {
-      const charges = await q<{
-        id: string; patient_id: string; description: string; billing_unit: string; quantity: string;
-        unit_price_paise: string; discount_paise: string; tax_rate_bp: number; tax_inclusive: boolean;
-      }>(
-        `SELECT id, patient_id, description, billing_unit, quantity::text, unit_price_paise, discount_paise, tax_rate_bp, tax_inclusive
-           FROM billable_charge WHERE id = ANY($1::uuid[]) AND organization_id = $2 ORDER BY created_at, id`,
-        [input.chargeIds, actor.organizationId],
-        db,
-      );
-      if (charges.length !== new Set(input.chargeIds).size) throw new DomainError("NOT_FOUND", "One or more charges were not found.");
-      if (charges.some((c) => c.patient_id !== input.patientId)) {
-        throw new DomainError("VALIDATION", "All charges on one invoice must belong to the same patient.");
-      }
-      const inv = (await q1<{ id: string }>(
-        `INSERT INTO invoice (organization_id, patient_id, appointment_id, created_by) VALUES ($1,$2,$3,$4) RETURNING id`,
-        [actor.organizationId, input.patientId, input.appointmentId ?? null, actor.label],
-        db,
-      ))!;
-      let i = 0;
-      for (const c of charges) {
-        const r = computeLine({
-          quantityMilli: parseQuantityMilli(c.quantity),
-          unitPricePaise: BigInt(c.unit_price_paise),
-          discountPaise: BigInt(c.discount_paise),
-          taxRateBp: c.tax_rate_bp,
-          taxInclusive: c.tax_inclusive,
-        });
-        await db.query(
-          `INSERT INTO invoice_line (invoice_id, billable_charge_id, description, billing_unit, quantity, unit_price_paise, discount_paise,
-             tax_rate_bp, tax_inclusive, taxable_paise, tax_paise, total_paise, sort_order)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-          [inv.id, c.id, c.description, c.billing_unit, c.quantity, c.unit_price_paise, c.discount_paise, c.tax_rate_bp,
-           c.tax_inclusive, r.taxablePaise.toString(), r.taxPaise.toString(), r.totalPaise.toString(), i++],
-        );
-      }
-      await recomputeInvoiceTotals(db, inv.id);
-      await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "invoice.draft.create", targetType: "invoice", targetId: inv.id, changes: { charges: input.chargeIds }, correlationId });
-      return { invoiceId: inv.id };
-    });
+    return await tx((db) => draftFromCharges(db, actor, input.patientId, input.chargeIds, input.appointmentId ?? null, correlationId));
   } catch (e) {
     if (pgErrorCode(e) === "23505" && pgConstraint(e) === "invoice_line_charge_claim") {
       throw new DomainError("ALREADY_BILLED", "One of these charges is already on another invoice or draft.");
     }
     throw e;
   }
+}
+
+async function draftFromCharges(db: Db, actor: StaffActor, patientId: string, chargeIds: string[], appointmentId: string | null, correlationId: string) {
+  const charges = await q<{
+    id: string; patient_id: string; description: string; billing_unit: string; quantity: string;
+    unit_price_paise: string; discount_paise: string; tax_rate_bp: number; tax_inclusive: boolean;
+  }>(
+    `SELECT id, patient_id, description, billing_unit, quantity::text, unit_price_paise, discount_paise, tax_rate_bp, tax_inclusive
+       FROM billable_charge WHERE id = ANY($1::uuid[]) AND organization_id = $2 ORDER BY created_at, id`,
+    [chargeIds, actor.organizationId],
+    db,
+  );
+  if (charges.length !== new Set(chargeIds).size) throw new DomainError("NOT_FOUND", "One or more charges were not found.");
+  if (charges.some((c) => c.patient_id !== patientId)) {
+    throw new DomainError("VALIDATION", "All charges on one invoice must belong to the same patient.");
+  }
+  const inv = (await q1<{ id: string }>(
+    `INSERT INTO invoice (organization_id, patient_id, appointment_id, created_by) VALUES ($1,$2,$3,$4) RETURNING id`,
+    [actor.organizationId, patientId, appointmentId, actor.label],
+    db,
+  ))!;
+  let i = 0;
+  for (const c of charges) {
+    const r = computeLine({
+      quantityMilli: parseQuantityMilli(c.quantity),
+      unitPricePaise: BigInt(c.unit_price_paise),
+      discountPaise: BigInt(c.discount_paise),
+      taxRateBp: c.tax_rate_bp,
+      taxInclusive: c.tax_inclusive,
+    });
+    await db.query(
+      `INSERT INTO invoice_line (invoice_id, billable_charge_id, description, billing_unit, quantity, unit_price_paise, discount_paise,
+         tax_rate_bp, tax_inclusive, taxable_paise, tax_paise, total_paise, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      [inv.id, c.id, c.description, c.billing_unit, c.quantity, c.unit_price_paise, c.discount_paise, c.tax_rate_bp,
+       c.tax_inclusive, r.taxablePaise.toString(), r.taxPaise.toString(), r.totalPaise.toString(), i++],
+    );
+  }
+  await recomputeInvoiceTotals(db, inv.id);
+  await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "invoice.draft.create", targetType: "invoice", targetId: inv.id, changes: { charges: chargeIds }, correlationId });
+  return { invoiceId: inv.id };
+}
+
+export interface DirectLine { serviceId?: string | null; description?: string; quantity?: string; unitPriceRupees?: string; discountRupees?: string }
+
+/**
+ * Invoice a patient directly — walk-ins, packages, braces/tape — without an
+ * appointment. Each line becomes a billable charge recorded as supplied by
+ * this staff member, then the same draft → issue flow applies (numbering,
+ * immutability and the one-charge-one-line rule are unchanged).
+ * A catalog line uses the current catalog price unless a price is entered.
+ */
+export async function createDirectInvoice(
+  actor: Actor,
+  input: { patientId: string; lines: DirectLine[] },
+  correlationId: string,
+) {
+  assertPermission(actor, "INVOICE_DRAFT");
+  const lines = input.lines.filter((l) => l.serviceId || l.description?.trim() || l.unitPriceRupees?.trim());
+  if (!lines.length) throw new DomainError("VALIDATION", "Add at least one line.");
+  return tx(async (db) => {
+    const patient = await q1<{ id: string }>(`SELECT id FROM patient WHERE id=$1 AND organization_id=$2`, [input.patientId, actor.organizationId], db);
+    if (!patient) throw new DomainError("NOT_FOUND", "Patient not found.");
+    const chargeIds: string[] = [];
+    for (const [idx, l] of lines.entries()) {
+      const n = idx + 1;
+      let qty: bigint;
+      try { qty = parseQuantityMilli(l.quantity?.trim() || "1"); } catch { throw new DomainError("VALIDATION", `Line ${n}: enter a valid quantity.`); }
+      if (qty <= 0n) throw new DomainError("VALIDATION", `Line ${n}: quantity must be more than zero.`);
+      let description = l.description?.trim() ?? "";
+      let unit = "Item";
+      let price: bigint | null = null;
+      let rate = 0;
+      let inclusive = false;
+      let serviceId: string | null = null;
+      if (l.serviceId) {
+        const svc = await q1<{ id: string; name: string; bill_description: string | null; billing_unit: string; unit_price_paise: string | null; rate_bp: number | null; inclusive: boolean | null }>(
+          `SELECT s.id, s.name, s.bill_description, s.billing_unit, pv.unit_price_paise, tc.rate_bp, tc.price_inclusive inclusive
+             FROM service s
+             LEFT JOIN LATERAL (SELECT * FROM service_price_version p WHERE p.service_id=s.id AND p.branch_id IS NULL AND p.valid_during @> now() LIMIT 1) pv ON true
+             LEFT JOIN tax_category tc ON tc.id = pv.tax_category_id
+            WHERE s.id=$1 AND s.organization_id=$2`, [l.serviceId, actor.organizationId], db);
+        if (!svc) throw new DomainError("NOT_FOUND", `Line ${n}: service not found.`);
+        serviceId = svc.id;
+        description ||= svc.bill_description || svc.name;
+        unit = svc.billing_unit;
+        price = svc.unit_price_paise != null ? BigInt(svc.unit_price_paise) : null;
+        rate = svc.rate_bp ?? 0;
+        inclusive = svc.inclusive ?? false;
+      }
+      if (l.unitPriceRupees?.trim()) {
+        try { price = parseRupeesToPaise(l.unitPriceRupees); } catch { throw new DomainError("VALIDATION", `Line ${n}: enter a valid price.`); }
+      }
+      if (price === null) throw new DomainError("VALIDATION", `Line ${n}: this service has no catalog price — enter a price.`);
+      if (description.length < 2) throw new DomainError("VALIDATION", `Line ${n}: describe what is being billed.`);
+      let discount = 0n;
+      if (l.discountRupees?.trim()) {
+        try { discount = parseRupeesToPaise(l.discountRupees); } catch { throw new DomainError("VALIDATION", `Line ${n}: enter a valid discount.`); }
+      }
+      const gross = (price * qty) / 1000n;
+      if (discount > gross) throw new DomainError("VALIDATION", `Line ${n}: the discount is larger than the line amount.`);
+      const row = (await q1<{ id: string }>(
+        `INSERT INTO billable_charge (organization_id, patient_id, service_id, description, billing_unit, quantity, unit_price_paise,
+           discount_paise, tax_rate_bp, tax_inclusive, performed_verified_by)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
+        [actor.organizationId, patient.id, serviceId, description.slice(0, 200), unit, formatQuantity(qty), price.toString(),
+         discount.toString(), rate, inclusive, actor.label], db))!;
+      chargeIds.push(row.id);
+    }
+    return draftFromCharges(db, actor, patient.id, chargeIds, null, correlationId);
+  });
 }
 
 async function recomputeInvoiceTotals(db: Db, invoiceId: string) {

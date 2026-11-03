@@ -23,8 +23,10 @@ export default async function InvoicesPage() {
   );
   return (
     <>
-      <PageHeader title="Invoices" lead="Collection status is derived from verified, allocated payments — never a manual paid flag." />
-      {rows.length === 0 ? <EmptyState>No invoices yet. Create one from a completed appointment.</EmptyState> : (
+      <PageHeader title="Invoices" lead="Collection status is derived from verified, allocated payments — never a manual paid flag.">
+        {actor.permissions.has("INVOICE_DRAFT") ? <Link href="/admin/invoices/new" className="btn btn-primary">+ New invoice</Link> : null}
+      </PageHeader>
+      {rows.length === 0 ? <EmptyState>No invoices yet. Use “New invoice”, or bill a completed appointment from its page.</EmptyState> : (
         <div className="card table-region" role="region" aria-label="Invoices" tabIndex={0}>
           <table className="data">
             <thead><tr><th>Number</th><th>Patient</th><th>Date</th><th>Document</th><th>Collection</th><th className="num">Total</th><th className="num">Due</th></tr></thead>

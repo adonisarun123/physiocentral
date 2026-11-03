@@ -74,6 +74,7 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
     <>
       <PageHeader title={a.patient} lead={<><span className="font-mono">{a.public_ref}</span> · {a.service} · {formatDateTime(a.starts_at, a.timezone)}</>}>
         <StatusBadge status={a.status} />
+        {can(actor, "PATIENT_CONTACT_VIEW") ? <Link href={`/admin/patients/${a.patient_id}`} className="btn btn-secondary btn-sm">Patient record</Link> : null}
       </PageHeader>
       <p className="mb-4 text-sm text-[var(--color-ink-muted)]">Version {a.version}. If someone else changes this appointment, your next action is refused and you&apos;ll be asked to reload.</p>
 

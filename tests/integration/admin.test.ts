@@ -4,6 +4,10 @@ import { DomainError } from "@/lib/errors";
 import { findSlots } from "@/modules/scheduling/availability";
 import { addTimeOff, createTherapist, removeTimeOff, setTherapistActive, setTherapistHours, updateTherapistProfile } from "@/modules/clinic/team";
 import { createService, updateServiceDetails } from "@/modules/catalog/admin";
+import { createPatient, searchPatients } from "@/modules/patients/admin";
+import { createStaffBooking } from "@/modules/scheduling/staff-booking";
+import { createDirectInvoice, issueInvoice } from "@/modules/billing/invoices";
+import { recordManualPayment } from "@/modules/payments/manual";
 import { buildFixture, resetDatabase, type Fixture } from "./helpers";
 
 let f: Fixture;
@@ -110,5 +114,62 @@ describe("catalog admin", () => {
 
   it("only price-managers can set a price when adding", async () => {
     await expectCode(createService(f.receptionist, { name: "Something", durationMinutes: 30, billingUnit: "Session", allTherapists: false }, "t"), "FORBIDDEN");
+  });
+});
+
+describe("front desk: patients, phone/walk-in booking, direct invoices, payments", () => {
+  let patientId: string;
+
+  it("registers a patient and refuses an accidental duplicate phone unless overridden", async () => {
+    patientId = (await createPatient(f.receptionist, { fullName: "Kavya S", phone: "98450 11111" }, "t")).patientId;
+    await expectCode(createPatient(f.receptionist, { fullName: "Kavya Sharma", phone: "+91 98450 11111" }, "t"), "DUPLICATE");
+    await createPatient(f.receptionist, { fullName: "Kavya's mother", phone: "9845011111", allowDuplicate: true }, "t");
+    const hits = await searchPatients(f.orgId, "11111");
+    expect(hits.length).toBe(2);
+  });
+
+  it("staff booking confirms directly and the same slot cannot be booked twice for one clinician", async () => {
+    const day = await localDate(9);
+    const slots = await findSlots({ branchId: f.branchA, serviceId: f.sessionSvc, therapistId: f.therapist2, date: day.d, enforceLeadTime: false });
+    // therapist2's hours were cleared earlier; restore via therapist1 instead
+    const s1 = slots.length ? slots : await findSlots({ branchId: f.branchA, serviceId: f.sessionSvc, therapistId: f.therapist1, date: day.d, enforceLeadTime: false });
+    const t = s1[0].therapist_id;
+    const startsAt = new Date(s1[0].starts_at).toISOString();
+    const r = await createStaffBooking(f.receptionist, { patientId, serviceId: f.sessionSvc, therapistId: t, startsAt, source: "WALK_IN" }, "t");
+    const a = (await q1<{ status: string; source: string; therapist_id: string }>(`SELECT status, source, therapist_id FROM appointment WHERE id=$1`, [r.appointmentId]))!;
+    expect(a).toEqual({ status: "CONFIRMED", source: "WALK_IN", therapist_id: t });
+    await expectCode(createStaffBooking(f.receptionist, { patientId, serviceId: f.sessionSvc, therapistId: t, startsAt, source: "PHONE" }, "t"), "SLOT_UNAVAILABLE");
+    const res = await q1<{ n: number }>(`SELECT count(*)::int n FROM resource_reservation WHERE appointment_id=$1 AND state='CONFIRMED'`, [r.appointmentId]);
+    expect(res!.n).toBe(1);
+  });
+
+  it("a physiotherapist role cannot create bookings", async () => {
+    await expectCode(createStaffBooking(f.physio, { patientId, serviceId: f.sessionSvc, startsAt: new Date().toISOString(), source: "PHONE" }, "t"), "FORBIDDEN");
+  });
+
+  it("direct invoice: catalog price, custom item, quantity and discount add up exactly; issue numbers it", async () => {
+    const { invoiceId } = await createDirectInvoice(f.receptionist, { patientId, lines: [
+      { serviceId: f.sessionSvc, quantity: "2" },                                   // 2 × ₹1,000
+      { description: "Knee brace", unitPriceRupees: "850.50", discountRupees: "50.50" }, // ₹800
+      { description: "", unitPriceRupees: "" },                                    // blank row ignored
+    ] }, "t");
+    const inv = (await q1<{ total_paise: string; status: string; appointment_id: string | null }>(`SELECT total_paise, status, appointment_id FROM invoice WHERE id=$1`, [invoiceId]))!;
+    expect(inv).toEqual({ total_paise: "280000", status: "DRAFT", appointment_id: null });
+    await expectCode(createDirectInvoice(f.receptionist, { patientId, lines: [{ description: "Tape", unitPriceRupees: "100", discountRupees: "200" }] }, "t"), "VALIDATION");
+    await expectCode(createDirectInvoice(f.receptionist, { patientId, lines: [] }, "t"), "VALIDATION");
+    const v = (await q1<{ version: number }>(`SELECT version FROM invoice WHERE id=$1`, [invoiceId]))!;
+    const issued = await issueInvoice(f.billing, { invoiceId, expectedVersion: v.version }, "t");
+    expect(issued.number).toMatch(/\d+$/);
+    // Pay ₹1,000 against it from the standalone payment flow.
+    await recordManualPayment(f.billing, { patientId, method: "CASH", amountRupees: "1000", receivedOn: "2026-11-03", receivingAccount: "Front desk", intendedInvoiceId: invoiceId, verifyNow: true }, "t");
+    const bal = (await q1<{ amount_due_paise: string }>(`SELECT amount_due_paise::text FROM invoice_balance WHERE invoice_id=$1`, [invoiceId]))!;
+    expect(bal.amount_due_paise).toBe("180000");
+  });
+
+  it("an advance payment with no invoice stays as unallocated credit", async () => {
+    const r = await recordManualPayment(f.billing, { patientId, method: "UPI_MANUAL", amountRupees: "5000", reference: "UTR-ADV-1", receivedOn: "2026-11-03", receivingAccount: "Clinic UPI", verifyNow: true }, "t");
+    const funds = (await q1<{ unallocated_paise: string }>(`SELECT unallocated_paise::text FROM payment_funds WHERE payment_id=$1`, [r.paymentId]))!;
+    expect(funds.unallocated_paise).toBe("500000");
+    expect(r.receiptNumber).toBeTruthy();
   });
 });
