@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
-import { PolicyPage } from "@/components/policy-page";
+import { PolicyPage, policyMetadata } from "@/components/policy-page";
 
-export const metadata: Metadata = { title: "Cancellation and refunds", alternates: { canonical: "/cancellation-refunds" } };
+export const dynamic = "force-dynamic";
+export const metadata = policyMetadata("cancellation-refunds");
 
 export default function Page() {
-  return <PolicyPage title="Cancellation and refunds" kind="cancellation-refunds" />;
+  return <PolicyPage kind="cancellation-refunds" />;
 }

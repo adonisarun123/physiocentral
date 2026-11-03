@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
-import { PolicyPage } from "@/components/policy-page";
+import { PolicyPage, policyMetadata } from "@/components/policy-page";
 
-export const metadata: Metadata = { title: "Accessibility", alternates: { canonical: "/accessibility" } };
+export const dynamic = "force-dynamic";
+export const metadata = policyMetadata("accessibility");
 
 export default function Page() {
-  return <PolicyPage title="Accessibility" kind="accessibility" />;
+  return <PolicyPage kind="accessibility" />;
 }

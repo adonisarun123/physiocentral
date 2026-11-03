@@ -13,6 +13,7 @@ const NAV = [
   { href: "/services", label: "Services" },
   { href: "/team", label: "Our team" },
   { href: "/about", label: "About" },
+  { href: "/blog", label: "Blog" },
   { href: "/contact", label: "Contact & visit" },
 ];
 
@@ -60,7 +61,6 @@ export default async function PublicLayout({ children }: { children: React.React
             </ul>
           </nav>
           <div className="flex items-center gap-3">
-            <Link href="/contact" className="btn btn-secondary hidden xl:inline-flex">Contact</Link>
             <Link href="/book" className="btn btn-primary hidden sm:inline-flex">Request appointment</Link>
           </div>
         </div>
