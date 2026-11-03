@@ -3,6 +3,7 @@ import { DomainError } from "@/lib/errors";
 import { audit } from "@/modules/audit";
 import { assertPermission, type Actor } from "@/modules/auth/actor";
 import { parseRupeesToPaise } from "@/modules/billing/money";
+import { slugify } from "@/lib/slug";
 
 /**
  * Add an effective-dated price version (§7.1). Prices never change in place;
@@ -75,4 +76,97 @@ export async function setServiceStatus(
     }
     throw e;
   }
+}
+
+export interface ServiceDetailsInput {
+  name: string;
+  categoryId?: string | null;
+  durationMinutes: number;
+  billingUnit: string;
+  summary?: string;
+  headline?: string;
+  body?: string;
+  whoItMayHelp?: string;
+  conditions?: string[];
+}
+
+function checkDetails(i: ServiceDetailsInput) {
+  const name = i.name.trim();
+  if (name.length < 3) throw new DomainError("VALIDATION", "Enter a service name.", { name: "Required" });
+  if (!Number.isInteger(i.durationMinutes) || i.durationMinutes < 5 || i.durationMinutes > 480) {
+    throw new DomainError("VALIDATION", "Session length must be between 5 and 480 minutes.", { durationMinutes: "5–480" });
+  }
+  return {
+    name,
+    unit: i.billingUnit.trim() || "Session",
+    conditions: (i.conditions ?? []).map((c) => c.trim()).filter(Boolean).slice(0, 30),
+  };
+}
+
+/**
+ * Add a service. It starts as a DRAFT that is not public and not bookable —
+ * staff set a price, then use "Status and visibility" (which requires a named
+ * clinical reviewer to publish). Optionally every active physiotherapist is
+ * marked as able to provide it so it can be booked straight away.
+ */
+export async function createService(
+  actor: Actor,
+  input: ServiceDetailsInput & { priceRupees?: string; allTherapists: boolean },
+  correlationId: string,
+) {
+  assertPermission(actor, "CATALOG_MANAGE");
+  const d = checkDetails(input);
+  let pricePaise: bigint | null = null;
+  if (input.priceRupees?.trim()) {
+    if (!actor.permissions.has("PRICE_MANAGE")) throw new DomainError("FORBIDDEN", "You can add the service, but setting a price needs price permission. Leave the price blank.");
+    try { pricePaise = parseRupeesToPaise(input.priceRupees); } catch { throw new DomainError("VALIDATION", "Enter a valid price.", { priceRupees: "Invalid" }); }
+  }
+  return tx(async (db) => {
+    let slug = slugify(d.name);
+    if (await q1(`SELECT 1 FROM service WHERE organization_id=$1 AND slug=$2`, [actor.organizationId, slug], db)) {
+      slug = `${slug}-${Math.random().toString(36).slice(2, 6)}`;
+    }
+    const n = (await q1<{ n: number }>(`SELECT count(*)::int + 1 n FROM service WHERE organization_id=$1`, [actor.organizationId], db))!.n;
+    const code = `PC-S${String(n).padStart(3, "0")}-${Math.random().toString(36).slice(2, 5).toUpperCase()}`;
+    const svc = (await q1<{ id: string }>(
+      `INSERT INTO service (organization_id, category_id, code, slug, name, status, public, bookable, billing_unit, duration_minutes,
+         summary, headline, body, who_it_may_help, conditions, bill_description, fee_policy_text, content_status, sort_order)
+       VALUES ($1,$2,$3,$4,$5,'DRAFT',false,false,$6,$7,$8,$9,$10,$11,$12,$5,
+         'Fee confirmed after your assessment — you approve an itemised estimate before treatment.','DRAFT',200)
+       RETURNING id`,
+      [actor.organizationId, input.categoryId || null, code, slug, d.name, d.unit, input.durationMinutes,
+       input.summary?.trim() || null, input.headline?.trim() || null, input.body?.trim() || null, input.whoItMayHelp?.trim() || null, d.conditions],
+      db,
+    ))!;
+    await db.query(`INSERT INTO service_branch SELECT $1, id FROM branch WHERE organization_id=$2 ON CONFLICT DO NOTHING`, [svc.id, actor.organizationId]);
+    if (input.allTherapists) {
+      await db.query(`INSERT INTO therapist_skill SELECT id, $1 FROM therapist WHERE organization_id=$2 AND active ON CONFLICT DO NOTHING`, [svc.id, actor.organizationId]);
+    }
+    if (pricePaise !== null) {
+      await db.query(
+        `INSERT INTO service_price_version (service_id, valid_during, unit_price_paise, created_by) VALUES ($1, tstzrange(now(), NULL, '[)'), $2, $3)`,
+        [svc.id, pricePaise.toString(), actor.label],
+      );
+    }
+    await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "catalog.service.create", targetType: "service", targetId: svc.id, changes: { name: d.name, code, price: pricePaise?.toString() ?? null }, correlationId });
+    return { serviceId: svc.id, code };
+  });
+}
+
+/** Edit a service's descriptive details. Status/visibility and price have their own audited flows. */
+export async function updateServiceDetails(actor: Actor, input: ServiceDetailsInput & { serviceId: string }, correlationId: string) {
+  assertPermission(actor, "CATALOG_MANAGE");
+  const d = checkDetails(input);
+  return tx(async (db) => {
+    const r = await q1<{ id: string }>(
+      `UPDATE service SET name=$3, category_id=$4, duration_minutes=$5, billing_unit=$6, summary=$7, headline=$8, body=$9,
+              who_it_may_help=$10, conditions=$11, version=version+1, updated_at=now()
+        WHERE id=$1 AND organization_id=$2 RETURNING id`,
+      [input.serviceId, actor.organizationId, d.name, input.categoryId || null, input.durationMinutes, d.unit,
+       input.summary?.trim() || null, input.headline?.trim() || null, input.body?.trim() || null, input.whoItMayHelp?.trim() || null, d.conditions],
+      db,
+    );
+    if (!r) throw new DomainError("NOT_FOUND", "Service not found.");
+    await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "catalog.service.update", targetType: "service", targetId: r.id, changes: { name: d.name, durationMinutes: input.durationMinutes }, correlationId });
+  });
 }

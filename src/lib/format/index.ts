@@ -46,6 +46,12 @@ export function time12(hhmm: string): string {
 
 /** All opening intervals for a weekday, e.g. "9:00 am – 1:00 pm, 4:00 pm – 8:00 pm" or null when closed. */
 export function dayHours(hours: { weekday: number; opens: string; closes: string }[], weekday: number): string | null {
-  const list = hours.filter((h) => h.weekday === weekday);
+  // Merge overlapping/adjacent intervals so several clinicians' hours read as the clinic's hours.
+  const list: { opens: string; closes: string }[] = [];
+  for (const h of hours.filter((x) => x.weekday === weekday).sort((a, b) => a.opens.localeCompare(b.opens))) {
+    const last = list[list.length - 1];
+    if (last && h.opens <= last.closes) { if (h.closes > last.closes) last.closes = h.closes; }
+    else list.push({ opens: h.opens, closes: h.closes });
+  }
   return list.length ? list.map((h) => `${time12(h.opens)} – ${time12(h.closes)}`).join(", ") : null;
 }

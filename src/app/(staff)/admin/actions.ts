@@ -10,7 +10,8 @@ import { acceptAppointment, cancelAppointment, rejectAppointment, transitionAppo
 import { addEstimateLine, createEstimate, decideEstimate, markEstimateLinePerformed, removeEstimateLine, reviseEstimate, sendEstimateVersion } from "@/modules/billing/estimates";
 import { createDraftInvoice, discardDraftInvoice, issueInvoice } from "@/modules/billing/invoices";
 import { allocatePayment, recordManualPayment, verifyPayment } from "@/modules/payments/manual";
-import { addPriceVersion, setServiceStatus } from "@/modules/catalog/admin";
+import { addPriceVersion, createService, setServiceStatus, updateServiceDetails } from "@/modules/catalog/admin";
+import { addTimeOff, createTherapist, removeTimeOff, setTherapistActive, setTherapistHours, setTherapistServices, shiftsFromForm, updateTherapistProfile } from "@/modules/clinic/team";
 
 /**
  * Every action re-authenticates and authorises inside the domain service
@@ -157,4 +158,84 @@ export async function serviceStatusAction(_: ActionResult, fd: FormData) {
     }, cid);
     return "Service updated.";
   }, ["/admin/catalog", "/services"]);
+}
+
+// ───────────── Catalog: add / edit services ─────────────
+const lines = (fd: FormData, k: string) => s(fd, k).split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+const serviceDetails = (fd: FormData) => ({
+  name: s(fd, "name"), categoryId: s(fd, "categoryId") || null, durationMinutes: n(fd, "durationMinutes"),
+  billingUnit: s(fd, "billingUnit"), summary: s(fd, "summary"), headline: s(fd, "headline"), body: s(fd, "body"),
+  whoItMayHelp: s(fd, "whoItMayHelp"), conditions: lines(fd, "conditions"),
+});
+
+export async function createServiceAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const r = await createService(a, { ...serviceDetails(fd), priceRupees: s(fd, "priceRupees"), allTherapists: fd.get("allTherapists") === "on" }, cid);
+    return `Added as a draft (${r.code}). Open it below to set status and visibility when ready.`;
+  }, ["/admin/catalog"]);
+}
+
+export async function updateServiceAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => { await updateServiceDetails(a, { serviceId: s(fd, "serviceId"), ...serviceDetails(fd) }, cid); return "Details saved."; }, ["/admin/catalog", "/services"]);
+}
+
+// ───────────── Team & schedule ─────────────
+export async function createTherapistAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  let id: string | null = null;
+  const res = await run(async (a, cid) => {
+    const r = await createTherapist(a, {
+      displayName: s(fd, "displayName"), designation: s(fd, "designation"), bio: s(fd, "bio"),
+      languages: s(fd, "languages").split(",").map((x) => x.trim()).filter(Boolean),
+      serviceIds: fd.getAll("serviceId").map(String), shifts: shiftsFromForm(fd),
+    }, cid);
+    id = r.therapistId;
+  }, ["/admin/team", "/book"]);
+  if (res?.ok && id) redirect(`/admin/team/${id}?created=1`);
+  return res;
+}
+
+export async function updateTherapistAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    await updateTherapistProfile(a, {
+      therapistId: s(fd, "therapistId"), displayName: s(fd, "displayName"), designation: s(fd, "designation"), bio: s(fd, "bio"),
+      languages: s(fd, "languages").split(",").map((x) => x.trim()).filter(Boolean),
+      credentialsVerified: fd.get("credentialsVerified") === "on", public: fd.get("public") === "on",
+    }, cid);
+    return "Profile saved.";
+  }, ["/admin/team", `/admin/team/${s(fd, "therapistId")}`, "/"]);
+}
+
+export async function therapistActiveAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const active = s(fd, "active") === "true";
+    await setTherapistActive(a, { therapistId: s(fd, "therapistId"), active }, cid);
+    return active ? "Reactivated. They can be booked again." : "Deactivated. They no longer appear in online slots.";
+  }, ["/admin/team", `/admin/team/${s(fd, "therapistId")}`, "/book"]);
+}
+
+export async function therapistServicesAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => { await setTherapistServices(a, { therapistId: s(fd, "therapistId"), serviceIds: fd.getAll("serviceId").map(String) }, cid); return "Services saved."; },
+    [`/admin/team/${s(fd, "therapistId")}`, "/book"]);
+}
+
+export async function therapistHoursAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const r = await setTherapistHours(a, { therapistId: s(fd, "therapistId"), shifts: shiftsFromForm(fd) }, cid);
+    return r.outsideHours ? `Hours saved. Note: ${r.outsideHours} upcoming confirmed appointment(s) now fall outside these hours — they are kept; rebook if needed.` : "Hours saved. Online slots updated.";
+  }, [`/admin/team/${s(fd, "therapistId")}`, "/admin/schedule", "/", "/book", "/contact"]);
+}
+
+export async function addTimeOffAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const r = await addTimeOff(a, {
+      therapistId: s(fd, "therapistId") || null, fromDate: s(fd, "fromDate"), toDate: s(fd, "toDate"),
+      fromTime: s(fd, "fromTime"), toTime: s(fd, "toTime"), reason: s(fd, "reason"),
+    }, cid);
+    return r.clashes ? `Blocked. ${r.clashes} existing appointment(s)/request(s) fall in this period — contact those patients to rebook.` : "Blocked. No online bookings can be made in this period.";
+  }, ["/admin/schedule", `/admin/team/${s(fd, "therapistId")}`, "/book"]);
+}
+
+export async function removeTimeOffAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => { await removeTimeOff(a, s(fd, "id"), cid); return "Removed. Those times are open again."; },
+    ["/admin/schedule", `/admin/team/${s(fd, "therapistId")}`, "/book"]);
 }
