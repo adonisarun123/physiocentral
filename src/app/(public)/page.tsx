@@ -10,6 +10,7 @@ import { HeroVisual, type HeroLiveData } from "@/components/site/hero-visual";
 import { Marquee } from "@/components/site/marquee";
 import { MediaPanel, serviceImage } from "@/components/site/media";
 import { nextAvailableLabel, openStatus } from "@/modules/content/live";
+import { ORTHO } from "@/components/site/ortho-referral";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { alternates: { canonical: "/" } };
@@ -173,22 +174,37 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* ───── Numbers (facts only — no invented figures) ───── */}
+      {/* ───── Numbers. Dr Sunku's figures are from drnitinsunkuortho.com (his own site);
+             the rest come from the DB. No invented clinic outcome claims. ───── */}
       <section className="section bg-[var(--md-sys-color-surface-container)]" aria-labelledby="num-h">
-        <div className="wrap">
-          <h2 id="num-h" className="headline-large text-center" data-reveal>Your recovery, by the numbers</h2>
-          <dl className="mt-14 grid gap-10 text-center sm:grid-cols-2 lg:grid-cols-4">
+        <div className="wrap grid gap-14 lg:grid-cols-[0.85fr_1.15fr] lg:items-center lg:gap-20">
+          <div data-reveal>
+            <span className="brand-rule" aria-hidden="true"><i /><i /><i /></span>
+            <p className="eyebrow mt-5">Surgeon-led physiotherapy</p>
+            <h2 id="num-h" className="headline-large mt-3">Your recovery, backed by an orthopaedic surgeon</h2>
+            <p className="body-large mt-5 text-[var(--color-ink-muted)]">
+              Physio Central runs under the clinical direction of {ORTHO.name}. Your rehab plan follows the diagnosis, and if
+              something needs a surgeon&apos;s eye, you&apos;re one referral away, not starting over somewhere new.
+            </p>
+            <Link href="/about" className="link-arrow mt-7 inline-flex text-[var(--md-sys-color-primary)]">Meet Dr Sunku <ArrowRight size={16} aria-hidden="true" /></Link>
+          </div>
+          <dl className="grid grid-cols-2 gap-x-8 gap-y-12">
             {[
-              { n: String(services.length), l: "specialist services under one roof" },
-              { n: String(sessionMins), l: "minutes, one-to-one, every visit" },
-              { n: String(openDays || 6), l: "days a week, morning and evening" },
-              { n: "1", l: `working day to confirm your request` },
+              { n: "10", suf: "+", l: "years in orthopaedics & sports medicine", note: "Dr Sunku's clinical experience" },
+              { n: "10K", suf: "+", l: "patients consulted", note: "by Dr Sunku across his practice" },
+              { n: String(sessionMins), suf: " min", l: "one-to-one, every visit", note: "never a shared or group session" },
+              { n: String(openDays || 6), suf: " days", l: "a week, morning and evening", note: hours.length ? `Mon–Sat · ${dayHours(hours, 1)}` : "call for today's hours" },
             ].map((x, i) => (
-              <div key={x.l} data-reveal={String(i * 80)}>
+              <div key={x.l} className="border-t-[3px] pt-6" style={{ borderColor: `var(--brand-logo-${["blue", "green", "orange", "blue"][i]})` }} data-reveal={String(i * 80)}>
                 <dt className="sr-only">{x.l}</dt>
-                <dd>
-                  <span className="font-display block text-[4rem] leading-none" style={{ color: `var(--md-sys-color-${TONE[i]})` }}>{x.n}</span>
-                  <span className="body-medium mt-3 block text-[var(--color-ink-muted)]">{x.l}</span>
+                <dd className="m-0">
+                  <span className="font-display block text-[clamp(3rem,6vw,4.25rem)] leading-none text-[var(--color-ink)]">
+                    {x.n}{x.suf === "+"
+                      ? <span className="ml-0.5 align-[0.45em] text-[0.55em] text-[var(--md-sys-color-primary)]">+</span>
+                      : <span className="ml-2 text-[0.4em] text-[var(--color-ink-muted)]">{x.suf.trim()}</span>}
+                  </span>
+                  <span className="title-medium mt-3 block text-[var(--color-ink)]">{x.l}</span>
+                  <span className="body-small mt-1 block text-[var(--color-ink-muted)]">{x.note}</span>
                 </dd>
               </div>
             ))}
