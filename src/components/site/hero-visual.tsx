@@ -9,22 +9,15 @@ export interface HeroLiveData {
 }
 
 /**
- * Hero media in the Spear shape (large rounded lower-left corner) until clinic
- * photography arrives: the runner mark on the deep brand band, contour lines in
- * the three logo colours. The M3 elevated cards show LIVE data only.
+ * Hero media in the Spear shape (large rounded lower-left corner): a temporary
+ * licensed stock photo until clinic photography arrives. The M3 elevated cards
+ * show LIVE data only.
  */
 export function HeroVisual({ live }: { live: HeroLiveData }) {
   return (
     <div className="relative" data-reveal="120">
-      <div className="band curve-bl relative aspect-[6/5] overflow-hidden" aria-hidden="true">
-        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 600 500" preserveAspectRatio="xMidYMid slice" fill="none">
-          {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-            <path key={i} d={`M-20 ${330 - i * 26} C140 ${250 - i * 26} 260 ${380 - i * 26} 400 ${300 - i * 26} S560 ${220 - i * 26} 640 ${270 - i * 26}`}
-              stroke={["#0079f4", "#159c11", "#f06200"][i % 3]} strokeOpacity={0.35} strokeWidth={1.4} />
-          ))}
-        </svg>
-        <div className="absolute top-1/2 left-[56%] aspect-square w-[52%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
-        <Image src="/brand/logo-mark.svg" alt="" width={260} height={318} unoptimized priority className="absolute top-1/2 left-[56%] h-[46%] w-auto -translate-x-1/2 -translate-y-1/2" />
+      <div className="curve-bl relative aspect-[6/5] overflow-hidden bg-[var(--md-sys-color-surface-container-high)]">
+        <Image src="/images/stock/hero.webp" alt="A physiotherapist examining a patient's knee on a treatment table" fill priority sizes="(min-width: 1024px) 50vw, 100vw" className="object-cover" />
       </div>
       <ul className="mt-6 grid gap-3 sm:pointer-events-none sm:absolute sm:inset-0 sm:mt-0 sm:block" aria-label="Clinic status">
         {live.nextSlotLabel ? <LiveCard className="sm:top-6 sm:-left-8" icon={<CalendarCheck size={20} aria-hidden="true" />} tone="tertiary" label="Next available" value={live.nextSlotLabel} /> : null}

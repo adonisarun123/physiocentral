@@ -5,7 +5,7 @@ import { getPublicServices } from "@/modules/content/public";
 import { formatINR } from "@/modules/billing/money";
 import { PageHero } from "@/components/site/page-hero";
 import { iconForCategory } from "@/components/site/icon";
-import { MediaPanel } from "@/components/site/media";
+import { MediaPanel, serviceImage } from "@/components/site/media";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -36,7 +36,7 @@ export default async function ServicesPage() {
             {services.map((s, i) => (
               <li key={s.id} data-reveal={String((i % 3) * 80)}>
                 <Link href={`/services/${s.slug}`} className="group flex h-full flex-col no-underline">
-                  <MediaPanel icon={iconForCategory(s.category)} index={i} className={`aspect-[16/10] rounded-[var(--md-sys-shape-md)]`} />
+                  <MediaPanel icon={iconForCategory(s.category)} index={i} src={serviceImage(s.slug)} className={`aspect-[16/10] rounded-[var(--md-sys-shape-md)]`} />
                   <span className="label-large mt-5 text-[var(--md-sys-color-tertiary)]">{s.category ?? "Physiotherapy"}</span>
                   <span className="headline-small mt-1 text-[var(--color-ink)] group-hover:underline">{s.name}</span>
                   {s.summary ? <span className="body-medium mt-2 line-clamp-3 text-[var(--color-ink-muted)]">{s.summary}</span> : null}

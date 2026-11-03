@@ -6,7 +6,7 @@ import { getPublicBranches, getPublicService, getPublicServices } from "@/module
 import { formatINR } from "@/modules/billing/money";
 import { JsonLd, breadcrumbJsonLd, siteUrl } from "@/modules/content/schema";
 import { iconForCategory } from "@/components/site/icon";
-import { MediaPanel } from "@/components/site/media";
+import { MediaPanel, serviceImage } from "@/components/site/media";
 import { displayPhone, telHref } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
@@ -80,7 +80,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
             </div>
           </div>
           <div className="relative pb-10" data-reveal="120">
-            <MediaPanel icon={iconForCategory(s.category)} index={0} className="curve-bl aspect-[5/4]" />
+            <MediaPanel icon={iconForCategory(s.category)} index={0} src={serviceImage(s.slug)} priority sizes="(min-width: 1024px) 45vw, 100vw" className="curve-bl aspect-[5/4]" />
             <dl className="absolute right-0 bottom-0 left-8 grid grid-cols-2 gap-4 rounded-[var(--md-sys-shape-md)] bg-[var(--md-sys-color-surface-container-lowest)] p-5 shadow-[var(--md-sys-elevation-2)] sm:left-16">
               <div>
                 <dt className="label-medium flex items-center gap-1.5 text-[var(--color-ink-muted)]"><Clock size={16} aria-hidden="true" /> Session</dt>
@@ -196,7 +196,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
             {related.map((r, i) => (
               <li key={r.id} data-reveal>
                 <Link href={`/services/${r.slug}`} className="card card-hover flex h-full flex-col overflow-hidden !p-0 no-underline">
-                  <MediaPanel icon={iconForCategory(r.category)} index={i + 1} className="aspect-[16/9]" />
+                  <MediaPanel icon={iconForCategory(r.category)} index={i + 1} src={serviceImage(r.slug)} className="aspect-[16/9]" />
                   <span className="flex flex-col gap-2 p-5">
                     <span className="headline-small text-[var(--color-ink)]">{r.name}</span>
                     <span className="body-medium line-clamp-2 text-[var(--color-ink-muted)]">{r.summary}</span>

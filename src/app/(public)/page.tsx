@@ -8,7 +8,7 @@ import { BODY_AREAS } from "@/components/site/body-areas";
 import { iconForCategory } from "@/components/site/icon";
 import { HeroVisual, type HeroLiveData } from "@/components/site/hero-visual";
 import { Marquee } from "@/components/site/marquee";
-import { MediaPanel } from "@/components/site/media";
+import { MediaPanel, serviceImage } from "@/components/site/media";
 import { nextAvailableLabel, openStatus } from "@/modules/content/live";
 
 export const dynamic = "force-dynamic";
@@ -95,7 +95,7 @@ export default async function HomePage() {
             <ul className="mt-12 grid w-full gap-8 md:grid-cols-3">
               {cards.map((s, i) => (
                 <li key={s.id} className="flex flex-col" data-reveal={String(i * 80)}>
-                  <MediaPanel icon={iconForCategory(s.category)} index={i} className="aspect-[16/10] rounded-[var(--md-sys-shape-md)]" />
+                  <MediaPanel icon={iconForCategory(s.category)} index={i} src={serviceImage(s.slug)} className="aspect-[16/10] rounded-[var(--md-sys-shape-md)]" />
                   <h3 className="headline-small mt-6">{s.name}</h3>
                   {s.summary ? <p className="body-medium muted mt-2 line-clamp-3">{s.summary}</p> : null}
                   <Link href={`/services/${s.slug}`} className="btn btn-on-band mt-6 self-start">Explore {s.name.split(/ &| and /i)[0].toLowerCase()}</Link>
@@ -165,7 +165,10 @@ export default async function HomePage() {
                 {phone ? <a href={telHref(phone)} className="btn btn-ghost-light"><Phone size={18} aria-hidden="true" /> {displayPhone(phone)}</a> : null}
               </div>
             </div>
-            <MediaPanel icon="Dumbbell" index={1} className="curve-br min-h-[22rem]" />
+            <figure className="relative m-0">
+              <MediaPanel icon="Dumbbell" index={1} src="/images/stock/clinic.webp" alt="A physiotherapist guiding a patient through a dumbbell exercise" sizes="(min-width: 768px) 50vw, 100vw" className="curve-br h-full min-h-[22rem]" />
+              <figcaption className="body-small absolute top-3 right-3 rounded-[var(--md-sys-shape-sm)] bg-black/55 px-2 py-1 text-white">Illustrative photo</figcaption>
+            </figure>
           </div>
         </div>
       </section>
