@@ -18,13 +18,13 @@ export function clinicJsonLd(
   hours: { weekday: number; opens: string; closes: string }[] = [],
 ) {
   if (!clinic.identityVerified || !branch.addressVerified || !branch.addressLine || !branch.phone) return null;
-  const clinicId = siteUrl(`/locations/${branch.slug}#clinic`);
+  const clinicId = siteUrl("/contact#clinic");
   const catalogId = siteUrl("/services#catalog");
   const clinicNode: Record<string, unknown> = {
     "@type": "MedicalClinic",
     "@id": clinicId,
     name: clinic.tradeName,
-    url: siteUrl(`/locations/${branch.slug}`),
+    url: siteUrl("/contact"),
     telephone: branch.phone,
     medicalSpecialty: "https://schema.org/Physiotherapy",
     address: {

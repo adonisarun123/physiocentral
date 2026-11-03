@@ -57,7 +57,7 @@ export default async function HomePage() {
             <p className="body-large mt-5 max-w-lg text-[var(--color-ink-muted)]">A modern clinic experience built around your goals. Book online, one-to-one care, and fees agreed before treatment.</p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Link href="/book" className="btn btn-primary">Request appointment</Link>
-              <Link href="/locations/main" className="btn btn-secondary">Get directions <ArrowRight size={18} aria-hidden="true" /></Link>
+              <Link href="/contact#visit" className="btn btn-secondary">Get directions <ArrowRight size={18} aria-hidden="true" /></Link>
             </div>
           </div>
           <HeroVisual live={live} />
@@ -162,7 +162,7 @@ export default async function HomePage() {
               <p className="body-large muted">A treatment space with room to move, train and recover — on 24th Main Road, HSR Layout.</p>
               {hours.length ? <p className="body-medium">Mon–Sat · {dayHours(hours, 1)}</p> : null}
               <div className="flex flex-wrap gap-3 pt-2">
-                <Link href="/locations/main" className="btn btn-on-band">Hours &amp; directions</Link>
+                <Link href="/contact#visit" className="btn btn-on-band">Hours &amp; directions</Link>
                 {phone ? <a href={telHref(phone)} className="btn btn-ghost-light"><Phone size={18} aria-hidden="true" /> {displayPhone(phone)}</a> : null}
               </div>
             </div>
