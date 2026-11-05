@@ -1,16 +1,19 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 
-// Security headers (SEC-05). CSP keeps to self; no third-party scripts are loaded.
-// 'unsafe-inline' for scripts is required by Next's inline bootstrap without a nonce
-// setup; tighten with nonces before enabling any third-party checkout origin.
+// Security headers (SEC-05). CSP keeps to self plus Google Analytics 4 (gtag.js,
+// public pages only). 'unsafe-inline' for scripts is required by Next's inline
+// bootstrap without a nonce setup; tighten with nonces before enabling any
+// third-party checkout origin.
+const GA = "https://www.googletagmanager.com";
+const GA_BEACON = "https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com";
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'" + (process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""),
+  `script-src 'self' 'unsafe-inline' ${GA}` + (process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""),
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
+  `img-src 'self' data: blob: ${GA_BEACON}`,
   "font-src 'self'",
-  "connect-src 'self'",
+  `connect-src 'self' ${GA_BEACON}`,
   // Google Maps embed on /contact.
   "frame-src https://www.google.com https://maps.google.com",
   "frame-ancestors 'none'",

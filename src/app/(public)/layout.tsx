@@ -5,6 +5,7 @@ import { getOpeningHours, getPublicBranches, getPublicClinic } from "@/modules/c
 import { telHref, displayPhone, dayHours, groupHours } from "@/lib/format";
 import { Logo } from "@/components/site/logo";
 import { RevealRoot } from "@/components/site/reveal";
+import { GoogleAnalytics } from "@/components/site/google-analytics";
 import { OrthoReferralBand, ORTHO } from "@/components/site/ortho-referral";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export default async function PublicLayout({ children }: { children: React.React
   return (
     <>
       <RevealRoot />
+      <GoogleAnalytics />
       {/* Utility strip (band) */}
       <div className="band on-band text-sm">
         <div className="wrap flex min-h-10 items-center justify-between gap-4">
