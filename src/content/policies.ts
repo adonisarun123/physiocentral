@@ -12,7 +12,7 @@ export const POLICIES: Record<"privacy" | "terms" | "cancellation-refunds" | "ac
   privacy: {
     title: "Privacy notice",
     description: "How Physio Central collects, uses, stores and protects your personal data, and your rights under India's DPDP Act, 2023.",
-    updated: "3 November 2026",
+    updated: "5 November 2026",
     body: `
 This notice explains what personal data {{clinic}} ("we", "us") collects through this website and at the clinic, why we collect it, and the choices and rights you have. We follow the Digital Personal Data Protection Act, 2023 (DPDP Act) and the rules made under it.
 
@@ -32,7 +32,17 @@ When you send an appointment request we ask for:
 
 We deliberately **do not** ask for detailed medical history on the website. If you become a patient, your physiotherapist records clinical notes, assessment findings and treatment plans as part of your care. Those records are held securely and are only available to the clinical team looking after you.
 
-We also keep basic technical logs (such as IP address and browser type) for security and to keep the site working. We do not use advertising or tracking cookies.
+We also keep basic technical logs (such as IP address and browser type) for security and to keep the site working.
+
+## Analytics and cookies
+
+We use Google Analytics to understand how visitors use our public pages, such as which pages are viewed, roughly where visits come from (city level), and the device and browser used. Google Analytics sets cookies in your browser and processes this data on our behalf under Google's terms and privacy policy, which may include servers outside India.
+
+- Google's advertising features and ad personalisation are switched off, and we do not use advertising cookies.
+- Analytics does not run on your private appointment page or on staff systems.
+- We do not send your name, phone number, email or anything you type into the booking form to Google Analytics.
+
+You can block or delete cookies in your browser settings, or install Google's opt-out add-on (tools.google.com/dlpage/gaoptout). The site works fully without them.
 
 ## Why we use it
 
