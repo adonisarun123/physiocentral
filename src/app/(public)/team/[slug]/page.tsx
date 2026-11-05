@@ -4,13 +4,14 @@ import type { Metadata } from "next";
 import { getPublicTherapist } from "@/modules/content/public";
 import { JsonLd, siteUrl } from "@/modules/content/schema";
 import { PageHero } from "@/components/site/page-hero";
+import { pageOpenGraph } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const t = await getPublicTherapist((await params).slug);
   if (!t) return { title: "Not found", robots: { index: false } };
-  return { title: `${t.displayName}, ${t.designation}`, alternates: { canonical: `/team/${t.slug}` } };
+  return { title: `${t.displayName}, ${t.designation}`, alternates: { canonical: `/team/${t.slug}` }, openGraph: pageOpenGraph(`/team/${t.slug}`) };
 }
 
 export default async function TherapistPage({ params }: { params: Promise<{ slug: string }> }) {

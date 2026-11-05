@@ -6,12 +6,14 @@ import { formatINR } from "@/modules/billing/money";
 import { PageHero } from "@/components/site/page-hero";
 import { iconForCategory } from "@/components/site/icon";
 import { MediaPanel, serviceImage } from "@/components/site/media";
+import { pageOpenGraph } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Services",
   description: "Physiotherapy services offered by the clinic, with session length and fees or fee policy.",
   alternates: { canonical: "/services" },
+  openGraph: pageOpenGraph("/services"),
 };
 
 export default async function ServicesPage() {

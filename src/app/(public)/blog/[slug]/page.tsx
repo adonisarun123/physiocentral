@@ -7,6 +7,7 @@ import { Markdown, headings } from "@/components/site/markdown";
 import { JsonLd, siteUrl } from "@/modules/content/schema";
 import { ORTHO } from "@/components/site/ortho-referral";
 import { POSTS, getPost, readingMinutes, sortedPosts, fmtDate } from "@/content/blog/posts";
+import { pageOpenGraph } from "@/lib/seo";
 
 export function generateStaticParams() {
   return POSTS.map((p) => ({ slug: p.slug }));
@@ -21,7 +22,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: p.title,
     description: p.description,
     alternates: { canonical: `/blog/${p.slug}` },
-    openGraph: { type: "article", title: p.title, description: p.description, images: [p.image], publishedTime: p.date, modifiedTime: p.updated ?? p.date },
+    openGraph: pageOpenGraph(`/blog/${p.slug}`, { type: "article", title: p.title, description: p.description, images: [p.image], publishedTime: p.date, modifiedTime: p.updated ?? p.date }),
   };
 }
 

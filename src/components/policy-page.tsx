@@ -4,12 +4,13 @@ import { Markdown, headings } from "@/components/site/markdown";
 import { POLICIES } from "@/content/policies";
 import { getPublicBranches, getPublicClinic } from "@/modules/content/public";
 import { displayPhone } from "@/lib/format";
+import { pageOpenGraph } from "@/lib/seo";
 
 type Kind = keyof typeof POLICIES;
 
 export function policyMetadata(kind: Kind): Metadata {
   const p = POLICIES[kind];
-  return { title: p.title, description: p.description, alternates: { canonical: `/${kind}` } };
+  return { title: p.title, description: p.description, alternates: { canonical: `/${kind}` }, openGraph: pageOpenGraph(`/${kind}`) };
 }
 
 export async function PolicyPage({ kind }: { kind: Kind }) {

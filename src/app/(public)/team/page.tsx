@@ -4,9 +4,10 @@ import { getPublicTherapists } from "@/modules/content/public";
 import { PageHero } from "@/components/site/page-hero";
 import { ORTHO } from "@/components/site/ortho-referral";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { pageOpenGraph } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Our Team", description: "Physiotherapists at the clinic.", alternates: { canonical: "/team" } };
+export const metadata: Metadata = { title: "Our Team", description: "Physiotherapists at the clinic.", alternates: { canonical: "/team" }, openGraph: pageOpenGraph("/team") };
 
 export default async function TeamPage() {
   const team = await getPublicTherapists();

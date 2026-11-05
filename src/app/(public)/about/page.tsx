@@ -10,6 +10,7 @@ import { PageHero } from "@/components/site/page-hero";
 import { MediaPanel } from "@/components/site/media";
 import { BODY_AREAS } from "@/components/site/body-areas";
 import { ORTHO } from "@/components/site/ortho-referral";
+import { pageOpenGraph } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export const metadata: Metadata = {
   description:
     "Physio Central in HSR Layout, Bengaluru is a surgeon-led physiotherapy clinic under orthopaedic and sports-medicine surgeon Dr Nitin N Sunku.",
   alternates: { canonical: "/about" },
+  openGraph: pageOpenGraph("/about"),
 };
 
 /*

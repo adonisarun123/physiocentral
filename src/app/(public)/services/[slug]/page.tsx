@@ -8,6 +8,7 @@ import { JsonLd, breadcrumbJsonLd, siteUrl } from "@/modules/content/schema";
 import { iconForCategory } from "@/components/site/icon";
 import { MediaPanel, serviceImage } from "@/components/site/media";
 import { displayPhone, telHref } from "@/lib/format";
+import { pageOpenGraph } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: s.seoTitle ?? s.name,
     description: s.seoDescription ?? s.summary ?? `${s.name} at the clinic.`,
     alternates: { canonical: `/services/${s.slug}` },
-    openGraph: { title: s.seoTitle ?? s.name, description: s.seoDescription ?? s.summary ?? undefined, url: `/services/${s.slug}` },
+    openGraph: pageOpenGraph(`/services/${s.slug}`, { title: s.seoTitle ?? s.name, description: s.seoDescription ?? s.summary ?? undefined }),
   };
 }
 

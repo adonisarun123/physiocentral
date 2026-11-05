@@ -6,12 +6,14 @@ import { JsonLd, clinicJsonLd } from "@/modules/content/schema";
 import { telHref, displayPhone, WEEKDAYS, dayHours } from "@/lib/format";
 import { PageHero } from "@/components/site/page-hero";
 import { ORTHO } from "@/components/site/ortho-referral";
+import { pageOpenGraph } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Contact & visit us",
   description: "Call, book online or visit Physio Central in HSR Layout, Bengaluru — address, map, opening hours and directions.",
   alternates: { canonical: "/contact" },
+  openGraph: pageOpenGraph("/contact"),
 };
 
 /** Keyless Google Maps embed (no API key, no cookies until the user interacts). */

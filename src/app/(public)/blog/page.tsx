@@ -4,11 +4,13 @@ import { ArrowRight } from "lucide-react";
 import { PageHero } from "@/components/site/page-hero";
 import { MediaPanel } from "@/components/site/media";
 import { sortedPosts, readingMinutes, fmtDate } from "@/content/blog/posts";
+import { pageOpenGraph } from "@/lib/seo";
 
 export const metadata: Metadata = {
   title: "Blog — physiotherapy & recovery guides",
   description: "Practical guides on injury recovery, rehab after surgery, back pain and joint problems from the Physio Central clinical team in HSR Layout, Bengaluru.",
   alternates: { canonical: "/blog" },
+  openGraph: pageOpenGraph("/blog"),
 };
 
 export default function BlogIndex() {

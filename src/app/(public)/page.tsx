@@ -11,9 +11,10 @@ import { Marquee } from "@/components/site/marquee";
 import { MediaPanel, serviceImage } from "@/components/site/media";
 import { nextAvailableLabel, openStatus } from "@/modules/content/live";
 import { ORTHO } from "@/components/site/ortho-referral";
+import { pageOpenGraph } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { alternates: { canonical: "/" } };
+export const metadata: Metadata = { alternates: { canonical: "/" }, openGraph: pageOpenGraph("/") };
 
 const CONDITIONS = ["Arthritis", "Fractures", "TKR & THR rehab", "Arthroscopy rehab", "Ligament & muscle injuries", "Sports injuries", "Neck & back pain", "Sciatica", "Posture correction", "Home visits"];
 const FEATURED = ["post-surg", "spine", "sport"];
