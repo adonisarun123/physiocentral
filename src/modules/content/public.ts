@@ -97,14 +97,18 @@ export async function getPublicService(slug: string): Promise<PublicService | nu
 
 export interface PublicTherapist {
   id: string; slug: string; displayName: string; designation: string; bio: string | null; languages: string[];
+  /** Site-relative portrait path; null unless a photo exists AND image consent is recorded. */
+  photo: string | null;
 }
 
 export async function getPublicTherapists(): Promise<PublicTherapist[]> {
-  const rows = await q<{ id: string; slug: string; display_name: string; designation: string; bio: string | null; languages: string[] }>(
-    `SELECT id, slug, display_name, designation, bio, languages FROM therapist
+  const rows = await q<{ id: string; slug: string; display_name: string; designation: string; bio: string | null; languages: string[]; photo: string | null }>(
+    `SELECT id, slug, display_name, designation, bio, languages,
+            CASE WHEN image_consent THEN photo_path END AS photo
+       FROM therapist
       WHERE public AND active AND credentials_verified ORDER BY display_name`,
   );
-  return rows.map((r) => ({ id: r.id, slug: r.slug, displayName: r.display_name, designation: r.designation, bio: r.bio, languages: r.languages }));
+  return rows.map((r) => ({ id: r.id, slug: r.slug, displayName: r.display_name, designation: r.designation, bio: r.bio, languages: r.languages, photo: r.photo }));
 }
 
 export async function getPublicTherapist(slug: string): Promise<PublicTherapist | null> {
