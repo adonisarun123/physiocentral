@@ -4,7 +4,8 @@ import { Check, ArrowRight } from "lucide-react";
 import { PageHero } from "@/components/site/page-hero";
 import { pageOpenGraph } from "@/lib/seo";
 import {
-  CORE_PRICES, PACKAGES, SPECIALIST_PRICES, PACKAGE_INCLUDES, PACKAGE_BEST_FOR, PRICES_UPDATED, rupees, type PriceItem,
+  CORE_PRICES, PACKAGES, SPECIALIST_PRICES, PACKAGE_INCLUDES, PACKAGE_BEST_FOR, PRICES_UPDATED, CONSULTATION_VALIDITY_DAYS, CONSULTATION, SINGLE_SESSION, LONG_COURSE,
+  rupees, perSession, type PriceItem,
 } from "@/content/pricing";
 
 export const metadata: Metadata = {
@@ -24,12 +25,13 @@ function PriceTable({ title, items, caption }: { title: string; items: PriceItem
           <li key={p.name} className="flex items-baseline justify-between gap-4 py-3">
             <span>
               <span className="title-medium">{p.name}</span>
-              {p.highlight ? <span className="chip chip-tonal ml-2 align-middle">Popular</span> : null}
+              {p.sessions ? <span className="body-small block text-[var(--color-ink-muted)]">{p.sessions} sessions, one a day</span> : null}
               {p.note ? <span className="body-small block text-[var(--color-ink-muted)]">{p.note}</span> : null}
             </span>
-            <span className="text-right">
-              <span className="headline-small text-[var(--md-sys-color-primary)]">{rupees(p.amount)}</span>
+            <span className="shrink-0 text-right">
+              <span className="headline-small whitespace-nowrap text-[var(--md-sys-color-primary)]">{rupees(p.amount)}</span>
               {p.unit ? <span className="body-small block text-[var(--color-ink-muted)]">{p.unit}</span> : null}
+              {perSession(p) ? <span className="body-small block whitespace-nowrap text-[var(--color-ink-muted)]">{rupees(perSession(p)!)} / session</span> : null}
             </span>
           </li>
         ))}
@@ -52,8 +54,8 @@ export default function PricingPage() {
       <div className="wrap section">
         <div className="grid gap-6 lg:grid-cols-3">
           <PriceTable title="Consultation & sessions" items={CORE_PRICES} />
-          <PriceTable title="Treatment packages" items={PACKAGES} caption="All treatments included — see below." />
-          <PriceTable title="Specialist therapies" items={SPECIALIST_PRICES} caption="When booked on their own." />
+          <PriceTable title="Treatment packages" items={PACKAGES} caption="Every treatment below is included, with no extra charge." />
+          <PriceTable title="Specialist therapies" items={SPECIALIST_PRICES} caption="Prices when booked on their own. Included free in every package." />
         </div>
 
         <div className="mt-16 grid gap-10 lg:grid-cols-[1.4fr_1fr]">
@@ -75,6 +77,17 @@ export default function PricingPage() {
             </ul>
           </section>
         </div>
+
+        <section aria-labelledby="how-h" className="mt-16 max-w-3xl" data-reveal>
+          <h2 id="how-h" className="headline-small">How fees work</h2>
+          <ul className="body-large mt-4 list-disc space-y-2 pl-5 text-[var(--color-ink-muted)]">
+            <li>Paying per visit: {rupees(CONSULTATION.amount)} consultation on your first visit, then {rupees(SINGLE_SESSION.amount)} for each session.</li>
+            <li>With a package, the consultation is free. It stays valid for {CONSULTATION_VALIDITY_DAYS} days from your first visit.</li>
+            <li>A 7-, 10- or 30-day package covers that many sessions, one a day. It includes every treatment listed above that your physiotherapist recommends.</li>
+            <li>If you need 16 or more sessions, each one costs {rupees(LONG_COURSE.amount)}, and there&apos;s no consultation fee.</li>
+            <li>Dry needling, cupping and sports massage are included in packages. The specialist prices apply only when you book them on their own.</li>
+          </ul>
+        </section>
 
         <p className="body-small mt-12 max-w-3xl text-[var(--color-ink-muted)]">
           Prices in Indian rupees, updated {PRICES_UPDATED}. Fees may change; the fee confirmed at the clinic before treatment applies.
