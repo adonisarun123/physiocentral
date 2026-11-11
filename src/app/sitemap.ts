@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
 /** Strict allowlist of canonical, published, indexable pages (SEO-03). Never admin/portal/manage/book. */
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [services, team] = await Promise.all([getPublicServices(), getPublicTherapists()]);
-  const statics = ["/", "/services", "/team", "/about", "/blog", "/contact", "/privacy", "/terms", "/cancellation-refunds", "/accessibility"];
+  const statics = ["/", "/services", "/pricing", "/team", "/about", "/blog", "/contact", "/privacy", "/terms", "/cancellation-refunds", "/accessibility"];
   return [
     ...statics.map((p) => ({ url: siteUrl(p) })),
     ...services.map((s) => ({ url: siteUrl(`/services/${s.slug}`), lastModified: s.reviewedOn ?? undefined })),
