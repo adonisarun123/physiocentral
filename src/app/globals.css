@@ -258,6 +258,46 @@ body {
   .card-hover { transition: box-shadow var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard), border-color var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard); }
   .card-hover:hover { box-shadow: var(--md-sys-elevation-2); border-color: transparent; }
 
+  /* ── Service cards: clean outlined card, soft lift on hover ── */
+  .svc-card {
+    display: flex; flex-direction: column; height: 100%; padding: 1.5rem;
+    background: var(--md-sys-color-surface-container-lowest); color: var(--md-sys-color-on-surface);
+    border: 1px solid var(--md-sys-color-outline-variant); border-radius: var(--md-sys-shape-lg);
+    box-shadow: 0 1px 2px rgba(0,37,82,.05); text-decoration: none;
+    transition: transform var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard), box-shadow var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard), border-color var(--md-sys-motion-duration-medium) var(--md-sys-motion-easing-standard);
+  }
+  .svc-card:hover { transform: translateY(-3px); box-shadow: 0 14px 30px -12px rgba(0,37,82,.22); border-color: var(--md-sys-color-secondary); }
+  .svc-icon {
+    display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--md-sys-shape-md);
+    background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container);
+  }
+  .svc-more { display: inline-flex; align-items: center; gap: .4rem; font-size: .9375rem; font-weight: 600; color: var(--md-sys-color-primary); transition: gap var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard); }
+  .svc-card:hover .svc-more { gap: .7rem; }
+  .count-pill {
+    display: inline-flex; align-items: center; min-height: 28px; padding: 0 .875rem; border-radius: var(--md-sys-shape-full);
+    background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container);
+    font-size: .75rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; white-space: nowrap;
+  }
+  .eyebrow-caps { font-size: .8125rem; font-weight: 700; letter-spacing: .22em; text-transform: uppercase; color: var(--md-sys-color-inverse-primary); }
+  .band.hero-band { background-image: radial-gradient(56rem 28rem at 88% -20%, rgba(0,121,244,.38), transparent 62%), radial-gradient(40rem 22rem at 0% 120%, rgba(21,156,17,.16), transparent 60%); }
+  /* Closing call-to-action card */
+  .cta-card {
+    padding: clamp(1.75rem, 4vw, 3rem); border: 1px solid var(--md-sys-color-outline-variant); border-radius: var(--md-sys-shape-xl);
+    background: linear-gradient(135deg, var(--md-sys-color-surface-container-lowest), var(--md-sys-color-surface-container-low));
+    box-shadow: 0 18px 40px -24px rgba(0,37,82,.25);
+  }
+  /* Floating quick actions (desktop; phones use the bottom app bar) */
+  .fab-stack { position: fixed; right: 1.5rem; bottom: 1.5rem; z-index: 30; display: none; flex-direction: column; gap: .75rem; }
+  @media (min-width: 640px) { .fab-stack { display: flex; } }
+  .fab {
+    display: grid; place-items: center; width: 56px; height: 56px; border-radius: var(--md-sys-shape-full);
+    box-shadow: var(--md-sys-elevation-3); text-decoration: none;
+    transition: transform var(--md-sys-motion-duration-short) var(--md-sys-motion-easing-standard);
+  }
+  .fab:hover { transform: scale(1.06); }
+  .fab-call { background: var(--md-sys-color-inverse-surface); color: #fff; }
+  .fab-book { background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+
   /* ── Photo placeholder (until real photography is supplied) ── */
   .photo {
     position: relative; overflow: hidden; display: flex; align-items: flex-end;

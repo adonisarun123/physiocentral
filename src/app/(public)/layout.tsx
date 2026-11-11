@@ -77,6 +77,12 @@ export default async function PublicLayout({ children }: { children: React.React
         {phone ? <a href={telHref(phone)} className="btn btn-secondary flex-1"><Phone size={18} aria-hidden="true" /> Call</a> : null}
       </div>
 
+      {/* Floating quick actions (desktop) */}
+      <div className="fab-stack no-print">
+        {phone ? <a href={telHref(phone)} className="fab fab-call" aria-label={`Call ${displayPhone(phone)}`} title="Call the clinic"><Phone size={22} aria-hidden="true" /></a> : null}
+        <Link href="/book" className="fab fab-book" aria-label="Request an appointment" title="Request an appointment"><CalendarCheck size={22} aria-hidden="true" /></Link>
+      </div>
+
       <OrthoReferralBand />
 
       <footer className="band on-band">
