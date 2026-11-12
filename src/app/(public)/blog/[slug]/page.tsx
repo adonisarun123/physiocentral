@@ -47,6 +47,8 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         "@id": siteUrl(`${path}#page`),
         url: siteUrl(path),
         name: p.title,
+        // reviewedBy is a WebPage property in Schema.org (it is not defined on BlogPosting).
+        ...(p.reviewedBy ? { reviewedBy: { "@type": "Person", name: p.reviewedBy, ...(p.reviewedBy === ORTHO.name ? { jobTitle: "Consultant Orthopaedic Surgeon", identifier: ORTHO.registration, url: siteUrl("/about") } : {}) } } : {}),
         ...relatedLinkProp(renderedPaths),
       },
       {
@@ -58,7 +60,6 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         datePublished: p.date,
         dateModified: p.updated ?? p.date,
         author: { "@type": "Organization", name: p.author },
-        ...(p.reviewedBy ? { reviewedBy: { "@type": "Person", name: p.reviewedBy, ...(p.reviewedBy === ORTHO.name ? { jobTitle: "Consultant Orthopaedic Surgeon", identifier: ORTHO.registration, url: siteUrl("/about") } : {}) } } : {}),
         publisher: { "@id": siteUrl("/contact#clinic") },
         mainEntityOfPage: { "@id": siteUrl(`${path}#page`) },
       },

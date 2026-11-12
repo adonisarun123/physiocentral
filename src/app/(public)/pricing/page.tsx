@@ -90,7 +90,7 @@ export default function PricingPage() {
           </ul>
         </section>
 
-        <p className="body-small mt-12 max-w-3xl text-[var(--color-ink-muted)]">
+        <p className="body-small mt-12 max-w-3xl text-[var(--color-ink-muted)] [&_a]:text-[var(--md-sys-color-primary)] [&_a]:underline">
           Prices in Indian rupees, updated {PRICES_UPDATED}. Fees may change; the fee confirmed at the clinic before treatment applies.
           See our <Link href="/cancellation-refunds">cancellation &amp; refunds policy</Link>
           {linksFor("/pricing").map((l) => <span key={l.to}>, or read <Link href={l.to}>{l.anchor}</Link></span>)}.

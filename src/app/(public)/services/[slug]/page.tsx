@@ -132,7 +132,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
               {providers.map((t, i) => (
                 <span key={t.slug}>
                   {i > 0 ? (i === providers.length - 1 ? " and " : ", ") : ""}
-                  <Link href={`/team/${t.slug}`}>{t.display_name}</Link>, {t.designation.toLowerCase()}
+                  <Link href={`/team/${t.slug}`} className="text-[var(--md-sys-color-primary)] underline">{t.display_name}</Link>, {t.designation.toLowerCase()}
                 </span>
               ))}
               .

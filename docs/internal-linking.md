@@ -20,7 +20,7 @@ Not used, on purpose: `significantLink` (no click data yet) and `isSimilarTo` (t
 - Add, edit or remove records in `link-map.ts`. Every record needs a `why` that the visible copy of both pages supports.
 - `approved: false` pulls one link and its schema without deleting the record.
 - Service destinations are checked against live public services at render time, so archiving a service removes its links automatically. `npm run test:unit` fails on a destination that is not a real service, guide or page, on duplicates, and on self-links.
-- Clinical wording and service relationships are the clinical lead's call. Have Dr Sunku review the map when services or guides change.
+- Clinical wording and service relationships are the clinical lead's call. Dr Sunku approved the current map on 12 Nov 2026; have him review it again when services or guides change.
 
 ## Rollback
 

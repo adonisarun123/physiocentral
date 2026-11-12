@@ -19,7 +19,9 @@
  *    call any link significant.
  */
 
+/** Clinical sign-off on the relationships below: Dr Nitin N Sunku, relayed by Arun Mahendran on this date. */
 export const LINK_MAP_REVIEWED = "2026-11-12";
+export const LINK_MAP_APPROVED_BY = "Dr Nitin N Sunku";
 
 export interface LinkRecord {
   /** Root-relative canonical path of the destination. */

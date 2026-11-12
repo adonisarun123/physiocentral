@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { ArrowRight } from "lucide-react";
 import { getPublicServices, getPublicTherapist, getTherapistServiceSlugs } from "@/modules/content/public";
 import { JsonLd, relatedLinkProp, siteUrl } from "@/modules/content/schema";
 import { PageHero } from "@/components/site/page-hero";
@@ -64,11 +65,11 @@ export default async function TherapistPage({ params }: { params: Promise<{ slug
             <section aria-labelledby="provides-h" className="mt-10">
               <h2 id="provides-h" className="headline-small">Services {t.displayName} provides</h2>
               <ul className="mt-4 grid gap-x-8 gap-y-2 sm:grid-cols-2">
-                {services.map((s) => <li key={s.id}><Link href={`/services/${s.slug}`}>{s.name}</Link></li>)}
+                {services.map((s) => <li key={s.id}><Link href={`/services/${s.slug}`} className="text-[var(--md-sys-color-primary)] underline">{s.name}</Link></li>)}
               </ul>
             </section>
           ) : null}
-          <p className="mt-10"><Link href="/team" className="link-arrow text-[var(--md-sys-color-primary)]">Meet the whole team</Link></p>
+          <p className="mt-10"><Link href="/team" className="link-arrow text-[var(--md-sys-color-primary)]">Meet the whole team <ArrowRight size={16} aria-hidden="true" /></Link></p>
         </div>
       </div>
     </article>
