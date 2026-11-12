@@ -65,6 +65,34 @@ export function clinicJsonLd(
   return { "@context": "https://schema.org", "@graph": graph };
 }
 
+/**
+ * Relationship markup (relatedLink / isRelatedTo) is optional description, not a
+ * ranking lever. RELATIONSHIP_SCHEMA=off removes it site-wide without touching
+ * the visible links it describes.
+ */
+export function relationshipSchemaEnabled(): boolean {
+  return process.env.RELATIONSHIP_SCHEMA !== "off";
+}
+
+/** `relatedLink` for a WebPage node. Pass only paths the page actually rendered as visible links. */
+export function relatedLinkProp(renderedPaths: string[]): { relatedLink?: string[] } {
+  const urls = [...new Set(renderedPaths)].map((p) => siteUrl(p));
+  return relationshipSchemaEnabled() && urls.length ? { relatedLink: urls } : {};
+}
+
+/** `isRelatedTo` for a Service node, pointing at other live Service entities by their existing @id. */
+export function isRelatedToProp(services: { slug: string; name: string }[]): { isRelatedTo?: Record<string, string>[] } {
+  if (!relationshipSchemaEnabled() || !services.length) return {};
+  return {
+    isRelatedTo: services.map((s) => ({
+      "@type": "Service",
+      "@id": siteUrl(`/services/${s.slug}#service`),
+      name: s.name,
+      url: siteUrl(`/services/${s.slug}`),
+    })),
+  };
+}
+
 export function breadcrumbJsonLd(items: { name: string; path: string }[]) {
   return {
     "@context": "https://schema.org",

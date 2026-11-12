@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 import { ArrowLeft, ArrowRight, CalendarCheck } from "lucide-react";
 import { MediaPanel } from "@/components/site/media";
 import { Markdown, headings } from "@/components/site/markdown";
-import { JsonLd, siteUrl } from "@/modules/content/schema";
+import { JsonLd, relatedLinkProp, siteUrl } from "@/modules/content/schema";
+import { bodyLinkPaths, isContentPath, linksFor } from "@/content/link-map";
 import { ORTHO } from "@/components/site/ortho-referral";
 import { POSTS, getPost, readingMinutes, sortedPosts, fmtDate } from "@/content/blog/posts";
 import { pageOpenGraph } from "@/lib/seo";
@@ -32,20 +33,35 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
   if (!p) notFound();
   const toc = headings(p.body);
   const related = sortedPosts().filter((x) => x.slug !== p.slug).slice(0, 3);
+  const path = `/blog/${p.slug}`;
+  // Editorial links to services this guide supports, minus any the body already links (no duplicate links).
+  const inBody = bodyLinkPaths(p.body);
+  const care = linksFor(path).filter((l) => l.anchor && !inBody.includes(l.to));
+  // relatedLink mirrors the contextual content links a reader can see: those in the body plus the block below.
+  const renderedPaths = [...inBody.filter(isContentPath), ...care.map((l) => l.to)];
   const ld = {
     "@context": "https://schema.org",
     "@graph": [
       {
+        "@type": "WebPage",
+        "@id": siteUrl(`${path}#page`),
+        url: siteUrl(path),
+        name: p.title,
+        // reviewedBy is a WebPage property in Schema.org (it is not defined on BlogPosting).
+        ...(p.reviewedBy ? { reviewedBy: { "@type": "Person", name: p.reviewedBy, ...(p.reviewedBy === ORTHO.name ? { jobTitle: "Consultant Orthopaedic Surgeon", identifier: ORTHO.registration, url: siteUrl("/about") } : {}) } } : {}),
+        ...relatedLinkProp(renderedPaths),
+      },
+      {
         "@type": "BlogPosting",
+        "@id": siteUrl(`${path}#article`),
         headline: p.title,
         description: p.description,
         image: siteUrl(p.image),
         datePublished: p.date,
         dateModified: p.updated ?? p.date,
         author: { "@type": "Organization", name: p.author },
-        ...(p.reviewedBy ? { reviewedBy: { "@type": "Person", name: p.reviewedBy, ...(p.reviewedBy === ORTHO.name ? { jobTitle: "Consultant Orthopaedic Surgeon", identifier: ORTHO.registration, url: siteUrl("/about") } : {}) } } : {}),
         publisher: { "@id": siteUrl("/contact#clinic") },
-        mainEntityOfPage: siteUrl(`/blog/${p.slug}`),
+        mainEntityOfPage: { "@id": siteUrl(`${path}#page`) },
       },
       {
         "@type": "BreadcrumbList",
@@ -84,6 +100,18 @@ export default async function PostPage({ params }: { params: Promise<{ slug: str
         <div className="wrap section grid max-w-6xl gap-12 pt-12 lg:grid-cols-[1fr_16rem]">
           <div className="max-w-[68ch]">
             <Markdown source={p.body} />
+            {care.length ? (
+              <aside aria-labelledby="care-h" className="card-filled mt-10">
+                <h2 id="care-h" className="title-large">Related care at Physio Central</h2>
+                <ul className="mt-3 space-y-2">
+                  {care.map((l) => (
+                    <li key={l.to}>
+                      <Link href={l.to} className="link-arrow text-[var(--md-sys-color-primary)]">{l.anchor} <ArrowRight size={16} aria-hidden="true" /></Link>
+                    </li>
+                  ))}
+                </ul>
+              </aside>
+            ) : null}
             <p className="body-small mt-12 border-t border-[var(--color-line)] pt-6 text-[var(--color-ink-muted)]">
               This article is general information, not a diagnosis or treatment plan. Always follow the advice of the clinician who knows your case. In an emergency, call 112.
             </p>
