@@ -1,7 +1,9 @@
+import { after } from "next/server";
 import { DomainError } from "@/lib/errors";
 import { clientIp, jsonRoute } from "@/lib/http";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { normalizeIndianPhone } from "@/modules/patients/contact";
+import { sendLeadAlert } from "@/modules/notifications/lead-alert";
 import { createBookingRequest } from "@/modules/scheduling/booking";
 
 export const dynamic = "force-dynamic";
@@ -19,6 +21,9 @@ export async function POST(req: Request) {
     await rateLimit(`booking:ip:${await clientIp()}`, 20, 3600);
     const phone = typeof body.phone === "string" ? normalizeIndianPhone(body.phone) : null;
     if (phone) await rateLimit(`booking:phone:${phone}`, 5, 3600);
-    return createBookingRequest({ ...body, idempotencyKey: key }, { source: "WEB", actorLabel: "public:api", correlationId: cid });
+    const result = await createBookingRequest({ ...body, idempotencyKey: key }, { source: "WEB", actorLabel: "public:api", correlationId: cid });
+    // Same front-desk alert as the booking form's Server Action; replays do not re-alert.
+    if (!result.replayed) after(() => sendLeadAlert(result.reference, cid));
+    return result;
   }, 201);
 }
