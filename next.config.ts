@@ -1,15 +1,21 @@
 import type { NextConfig } from "next";
+import { PHASE_DEVELOPMENT_SERVER } from "next/constants";
 import path from "node:path";
 
 // Security headers (SEC-05). CSP keeps to self plus Google Analytics 4 (gtag.js,
 // public pages only). 'unsafe-inline' for scripts is required by Next's inline
 // bootstrap without a nonce setup; tighten with nonces before enabling any
 // third-party checkout origin.
+//
+// 'unsafe-eval' is added for `next dev` only: React needs eval() there to rebuild
+// server stack traces. It is keyed off the Next phase, not NODE_ENV, because a
+// shell that exports NODE_ENV=production would otherwise serve the production
+// policy in dev and raise an "eval() is not supported" console error.
 const GA = "https://www.googletagmanager.com";
 const GA_BEACON = "https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com";
-const csp = [
+const buildCsp = (isDev: boolean) => [
   "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' ${GA}` + (process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""),
+  `script-src 'self' 'unsafe-inline' ${GA}` + (isDev ? " 'unsafe-eval'" : ""),
   "style-src 'self' 'unsafe-inline'",
   `img-src 'self' data: blob: ${GA_BEACON}`,
   "font-src 'self'",
@@ -22,7 +28,9 @@ const csp = [
   "object-src 'none'",
 ].join("; ");
 
-const nextConfig: NextConfig = {
+const nextConfig = (phase: string): NextConfig => {
+  const csp = buildCsp(phase === PHASE_DEVELOPMENT_SERVER);
+  return {
   // Cache Components is off: every page touching the DB is explicitly dynamic and
   // private pages must never land in a shared cache (SEC-04).
   cacheComponents: false,
@@ -60,6 +68,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+  };
 };
 
 export default nextConfig;
