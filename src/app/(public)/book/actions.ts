@@ -1,9 +1,11 @@
 "use server";
 
+import { after } from "next/server";
 import { correlationId, DomainError } from "@/lib/errors";
 import { clientIp } from "@/lib/http";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { normalizeIndianPhone } from "@/modules/patients/contact";
+import { sendLeadAlert } from "@/modules/notifications/lead-alert";
 import { createBookingRequest, type BookingRequestResult } from "@/modules/scheduling/booking";
 
 export type BookingActionState =
@@ -23,6 +25,8 @@ export async function submitBookingRequest(payload: Record<string, unknown>): Pr
     const phone = typeof payload.phone === "string" ? normalizeIndianPhone(payload.phone) : null;
     if (phone) await rateLimit(`booking:phone:${phone}`, 5, 3600);
     const result = await createBookingRequest(payload, { source: "WEB", actorLabel: "public:web", correlationId: cid });
+    // Email the front desk once the response is on its way; a replayed (duplicate) submit does not re-alert.
+    if (!result.replayed) after(() => sendLeadAlert(result.reference, cid));
     return { ok: true, result };
   } catch (err) {
     if (err instanceof DomainError) return { ok: false, error: err.message, code: err.code, fieldErrors: err.fieldErrors };
