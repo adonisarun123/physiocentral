@@ -1,10 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { Check, Clock, IndianRupee, Phone, Plus, ShieldAlert, ShieldCheck, Users, ClipboardList } from "lucide-react";
-import { getPublicBranches, getPublicService, getPublicServices } from "@/modules/content/public";
+import { ArrowRight, Check, Clock, IndianRupee, Phone, Plus, ShieldAlert, ShieldCheck, Users, ClipboardList } from "lucide-react";
+import { getPublicBranches, getPublicService, getPublicServices, getServiceTherapists } from "@/modules/content/public";
 import { formatINR } from "@/modules/billing/money";
-import { JsonLd, breadcrumbJsonLd, siteUrl } from "@/modules/content/schema";
+import { JsonLd, breadcrumbJsonLd, isRelatedToProp, relatedLinkProp, siteUrl } from "@/modules/content/schema";
+import { linksFor, relatedServiceSlugs } from "@/content/link-map";
+import { getPost } from "@/content/blog/posts";
 import { iconForCategory } from "@/components/site/icon";
 import { MediaPanel, serviceImage } from "@/components/site/media";
 import { displayPhone, telHref } from "@/lib/format";
@@ -26,9 +28,20 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 export default async function ServicePage({ params }: { params: Promise<{ slug: string }> }) {
   const s = await getPublicService((await params).slug);
   if (!s) notFound(); // real 404 (SEO-05)
-  const [all, branches] = await Promise.all([getPublicServices(), getPublicBranches()]);
+  const [all, branches, providers] = await Promise.all([getPublicServices(), getPublicBranches(), getServiceTherapists(s.id)]);
   const phone = branches[0]?.phone ?? null;
-  const related = all.filter((x) => x.id !== s.id).slice(0, 3);
+  const path = `/services/${s.slug}`;
+
+  // Editorial links (src/content/link-map.ts), resolved against what is live right now:
+  // a related service that has been archived, or a guide that no longer exists, drops out.
+  const related = relatedServiceSlugs(s.slug).flatMap((slug) => all.filter((x) => x.slug === slug));
+  const resources = linksFor(path).flatMap((l): { href: string; label: string; kind: "guide" | "page" }[] => {
+    if (!l.to.startsWith("/blog/")) return l.anchor ? [{ href: l.to, label: l.anchor, kind: "page" }] : [];
+    const p = getPost(l.to.slice("/blog/".length));
+    return p ? [{ href: l.to, label: p.title, kind: "guide" }] : [];
+  });
+  // relatedLink mirrors exactly the contextual links rendered below.
+  const renderedPaths = [...related.map((r) => `/services/${r.slug}`), ...resources.map((r) => r.href), ...providers.map((t) => `/team/${t.slug}`)];
   const fee = s.pricePaise ? `${formatINR(s.pricePaise)} per ${s.billingUnit.toLowerCase()}` : (s.feePolicyText ?? "Confirmed after assessment");
 
   // Service + MedicalWebPage markup generated from visible content only (§14.2). No FAQPage rich-result chasing (§14.3).
@@ -42,6 +55,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
         name: s.seoTitle ?? s.name,
         description: s.seoDescription ?? s.summary,
         about: { "@id": siteUrl(`/services/${s.slug}#service`) },
+        ...relatedLinkProp(renderedPaths),
       },
       {
         "@type": "Service",
@@ -51,6 +65,7 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
         serviceType: "Physiotherapy",
         provider: { "@id": siteUrl("/contact#clinic") },
         areaServed: "HSR Layout, Bengaluru",
+        ...isRelatedToProp(related),
       },
     ],
   };
@@ -110,6 +125,18 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
               <h3 className="title-large">Who it may help</h3>
               <p className="body-large mt-2 text-[var(--color-ink-muted)]">{s.whoItMayHelp}</p>
             </div>
+          ) : null}
+          {providers.length ? (
+            <p className="body-large mt-6 text-[var(--color-ink-muted)]">
+              Sessions are provided by{" "}
+              {providers.map((t, i) => (
+                <span key={t.slug}>
+                  {i > 0 ? (i === providers.length - 1 ? " and " : ", ") : ""}
+                  <Link href={`/team/${t.slug}`}>{t.display_name}</Link>, {t.designation.toLowerCase()}
+                </span>
+              ))}
+              .
+            </p>
           ) : null}
         </div>
         {s.conditions.length ? (
@@ -189,10 +216,10 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
         </div>
       </section>
 
-      {/* Related */}
-      {related.length ? (
+      {/* Related services, guides and fees: rendered from the editorial link map */}
+      {related.length || resources.length ? (
         <section className="wrap pb-20" aria-labelledby="rel-h">
-          <h2 id="rel-h" className="headline-large" data-reveal>Related services</h2>
+          <h2 id="rel-h" className="headline-large" data-reveal>{related.length ? "Related services" : "Useful next reads"}</h2>
           <ul className="mt-8 grid gap-6 sm:grid-cols-3">
             {related.map((r, i) => (
               <li key={r.id} data-reveal>
@@ -206,6 +233,24 @@ export default async function ServicePage({ params }: { params: Promise<{ slug: 
               </li>
             ))}
           </ul>
+          {resources.length ? (
+            <div className="mt-10" data-reveal>
+              {related.length ? <h3 className="title-large">Guides and fees</h3> : null}
+              <ul className="mt-4 divide-y divide-[var(--color-line)] border-y border-[var(--color-line)]">
+                {resources.map((r) => (
+                  <li key={r.href}>
+                    <Link href={r.href} className="state flex min-h-14 items-center justify-between gap-4 rounded-[var(--md-sys-shape-sm)] px-2 py-3 no-underline">
+                      <span>
+                        <span className="label-large block text-[var(--md-sys-color-tertiary)]">{r.kind === "guide" ? "Patient guide" : "Pricing"}</span>
+                        <span className="title-medium text-[var(--color-ink)]">{r.label}</span>
+                      </span>
+                      <ArrowRight size={18} className="shrink-0 text-[var(--md-sys-color-primary)]" aria-hidden="true" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           <p className="body-small mt-8 flex items-start gap-2 text-[var(--color-ink-muted)]">
             <ShieldCheck size={18} className="mt-0.5 shrink-0" aria-hidden="true" />
             General information about our services, not a diagnosis. Your physiotherapist will advise what&apos;s right for you after assessing you.

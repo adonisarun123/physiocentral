@@ -115,6 +115,26 @@ export async function getPublicTherapist(slug: string): Promise<PublicTherapist 
   return (await getPublicTherapists()).find((t) => t.slug === slug) ?? null;
 }
 
+/** Published, credential-checked therapists who provide a service (from the same skill rows that drive booking). */
+export async function getServiceTherapists(serviceId: string) {
+  return q<{ slug: string; display_name: string; designation: string }>(
+    `SELECT t.slug, t.display_name, t.designation FROM therapist t
+       JOIN therapist_skill ts ON ts.therapist_id=t.id AND ts.service_id=$1
+      WHERE t.public AND t.active AND t.credentials_verified ORDER BY t.display_name`,
+    [serviceId],
+  );
+}
+
+/** Slugs of live public services a therapist provides. */
+export async function getTherapistServiceSlugs(therapistId: string): Promise<string[]> {
+  const rows = await q<{ slug: string }>(
+    `SELECT s.slug FROM therapist_skill ts JOIN service s ON s.id=ts.service_id
+      WHERE ts.therapist_id=$1 AND s.status='ACTIVE' AND s.public ORDER BY s.sort_order, s.name`,
+    [therapistId],
+  );
+  return rows.map((r) => r.slug);
+}
+
 /** Therapists eligible for a service at a branch, for the booking picker. */
 export async function getBookableTherapists(serviceId: string, branchId: string) {
   return q<{ id: string; display_name: string; designation: string }>(

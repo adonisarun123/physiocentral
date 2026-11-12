@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Check, ArrowRight } from "lucide-react";
 import { PageHero } from "@/components/site/page-hero";
 import { pageOpenGraph } from "@/lib/seo";
+import { linksFor } from "@/content/link-map";
 import {
   CORE_PRICES, PACKAGES, SPECIALIST_PRICES, PACKAGE_INCLUDES, PACKAGE_BEST_FOR, PRICES_UPDATED, CONSULTATION_VALIDITY_DAYS, CONSULTATION, SINGLE_SESSION, LONG_COURSE,
   rupees, perSession, type PriceItem,
@@ -91,7 +92,8 @@ export default function PricingPage() {
 
         <p className="body-small mt-12 max-w-3xl text-[var(--color-ink-muted)]">
           Prices in Indian rupees, updated {PRICES_UPDATED}. Fees may change; the fee confirmed at the clinic before treatment applies.
-          See our <Link href="/cancellation-refunds">cancellation &amp; refunds policy</Link>.
+          See our <Link href="/cancellation-refunds">cancellation &amp; refunds policy</Link>
+          {linksFor("/pricing").map((l) => <span key={l.to}>, or read <Link href={l.to}>{l.anchor}</Link></span>)}.
         </p>
         <Link href="/book" className="link-arrow mt-6 inline-flex text-[var(--md-sys-color-primary)]">Book an assessment <ArrowRight size={16} aria-hidden="true" /></Link>
       </div>
