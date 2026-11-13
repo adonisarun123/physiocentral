@@ -17,8 +17,8 @@ export default async function TeamPage() {
       <PageHero eyebrow="Our team" title="The people who look after you" lead="Physiotherapy led by an orthopaedic and sports-medicine surgeon, delivered one-to-one by our physiotherapists." />
       <div className="wrap section">
         <div className="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:items-center">
-          <span className="grid aspect-[4/5] max-h-[28rem] place-items-center rounded-[var(--md-sys-shape-xl)] bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]" aria-hidden="true">
-            <span className="font-display text-[6rem] leading-none">NS</span>
+          <span className="relative block aspect-[4/5] max-h-[28rem] overflow-hidden rounded-[var(--md-sys-shape-xl)] bg-[var(--md-sys-color-surface-container)]">
+            <Image src="/images/team/dr-nitin-sunku.webp" alt={`${ORTHO.name}, consultant orthopaedic surgeon and clinical lead at Physio Central`} fill priority sizes="(min-width: 1024px) 40vw, 100vw" className="object-cover object-top" />
           </span>
           <div data-reveal>
             <p className="eyebrow">Clinical lead</p>
