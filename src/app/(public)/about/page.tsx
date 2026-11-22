@@ -5,7 +5,7 @@ import {
   ShieldCheck, ReceiptText, UserRound, House, Scissors, HeartPulse, Send, MapPin,
 } from "lucide-react";
 import { getOpeningHours, getPublicBranches, getPublicClinic, getPublicServices } from "@/modules/content/public";
-import { dayHours } from "@/lib/format";
+import { hoursSummary } from "@/lib/format";
 import { PageHero } from "@/components/site/page-hero";
 import { MediaPanel } from "@/components/site/media";
 import { BODY_AREAS } from "@/components/site/body-areas";
@@ -265,7 +265,7 @@ export default async function AboutPage() {
           <div className="card-filled" data-reveal="80">
             <p className="title-medium flex items-center gap-2"><MapPin size={18} aria-hidden="true" /> {branch.name}</p>
             <address className="body-medium mt-2 not-italic text-[var(--color-ink-muted)]">{[branch.addressLine, branch.locality, branch.city, branch.postalCode].filter(Boolean).join(", ")}</address>
-            {hours.length ? <p className="body-medium mt-3">Mon–Sat · {dayHours(hours, 1)}</p> : null}
+            {hours.length ? <p className="body-medium mt-3">{hoursSummary(hours)}</p> : null}
             <Link href="/contact#visit" className="link-arrow mt-4 inline-flex text-[var(--md-sys-color-primary)]">Map &amp; hours <ArrowRight size={16} aria-hidden="true" /></Link>
           </div>
         ) : null}

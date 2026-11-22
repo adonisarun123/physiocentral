@@ -1,9 +1,10 @@
 import Link from "next/link";
+import Image from "next/image";
 import type { Metadata } from "next";
 import { ArrowRight, CalendarCheck, UserRound, ReceiptText, House, Plus, Phone } from "lucide-react";
 import { getOpeningHours, getPublicBranches, getPublicClinic, getPublicServices, getPublicTherapists } from "@/modules/content/public";
 import { JsonLd, clinicJsonLd } from "@/modules/content/schema";
-import { telHref, displayPhone, dayHours } from "@/lib/format";
+import { telHref, displayPhone, hoursSummary } from "@/lib/format";
 import { BODY_AREAS } from "@/components/site/body-areas";
 import { iconForCategory } from "@/components/site/icon";
 import { HeroVisual, type HeroLiveData } from "@/components/site/hero-visual";
@@ -36,7 +37,6 @@ export default async function HomePage() {
   const sessionMins = services.find((s) => s.bookable && !/assess/i.test(s.slug))?.durationMinutes ?? 45;
   const openDays = new Set(hours.map((h) => h.weekday)).size;
   const phone = branch?.phone ?? clinic?.phone ?? null;
-  const lead = team[0];
 
   const benefits = [
     { icon: CalendarCheck, title: "Book online", body: `Choose a time in about two minutes. We confirm ${response}.` },
@@ -60,6 +60,14 @@ export default async function HomePage() {
               <Link href="/book" className="btn btn-primary">Request appointment</Link>
               <Link href="/contact#visit" className="btn btn-secondary">Get directions <ArrowRight size={18} aria-hidden="true" /></Link>
             </div>
+            <Link href="/about#doctor-h" className="group mt-10 flex max-w-lg items-center gap-4 border-t border-[var(--color-line)] pt-6 no-underline">
+              <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-full ring-2 ring-white shadow-sm">
+                <Image src="/images/team/dr-nitin-sunku.webp" alt="" fill sizes="56px" className="object-cover object-top" />
+              </span>
+              <span className="body-medium text-[var(--color-ink-muted)]">
+                Clinical direction by <span className="font-semibold text-[var(--color-ink)] group-hover:underline">{ORTHO.name}</span>, consultant orthopaedic &amp; sports-medicine surgeon
+              </span>
+            </Link>
           </div>
           <HeroVisual live={live} />
         </div>
@@ -114,43 +122,49 @@ export default async function HomePage() {
         <div className="wrap">
           <div className="max-w-2xl" data-reveal>
             <h2 id="hurt-h" className="headline-large">Not sure which service you need?</h2>
-            <p className="body-large mt-4 text-[var(--color-ink-muted)]">Start with where it hurts. Every option leads to an assessment, and your physiotherapist examines you before recommending any treatment.</p>
+            <p className="body-large mt-4 text-[var(--color-ink-muted)]">Start with where it hurts. Each one explains how we treat it. Every visit starts with an assessment, and your physiotherapist examines you before recommending any treatment.</p>
           </div>
           <ul className="mt-8 flex flex-wrap gap-3" data-reveal="80">
             {BODY_AREAS.map((a) => (
-              <li key={a.key}><Link href="/book" className="chip state min-h-12 rounded-[var(--md-sys-shape-sm)] px-4 text-[0.9375rem] text-[var(--color-ink)] no-underline">{a.label}</Link></li>
+              <li key={a.key}><Link href={services.some((x) => x.slug === a.service) ? `/services/${a.service}` : "/services"} className="chip state min-h-12 rounded-[var(--md-sys-shape-sm)] px-4 text-[0.9375rem] text-[var(--color-ink)] no-underline">{a.label}</Link></li>
             ))}
           </ul>
         </div>
       </section>
 
-      {/* ───── Team ───── */}
+      {/* ───── Team: clinical lead + physiotherapists, real portraits only ───── */}
       <section className="section" aria-labelledby="team-h">
         <div className="wrap">
-          <div className="max-w-2xl" data-reveal>
-            <h2 id="team-h" className="headline-large">Meet the team who keeps you moving</h2>
-            <p className="body-large mt-4 text-[var(--color-ink-muted)]">One-to-one care from clinicians who take the time to understand your goals — whether that&apos;s climbing stairs without pain or getting back on the field.</p>
-            <Link href="/team" className="link-arrow mt-6 text-[var(--color-ink)]">Meet the team <ArrowRight size={18} aria-hidden="true" /></Link>
-          </div>
-          {lead ? (
-            <div className="mt-12 grid items-center gap-10 md:grid-cols-2" data-reveal="80">
-              <div className="relative">
-                <div className="grid aspect-[5/4] place-items-center rounded-[var(--md-sys-shape-md)] bg-[var(--md-sys-color-secondary-container)] text-[var(--md-sys-color-on-secondary-container)]" aria-hidden="true">
-                  <span className="font-display text-[6rem] leading-none">{lead.displayName.replace(/^Dr\.? /, "").split(" ").map((p) => p[0]).slice(0, 2).join("")}</span>
-                </div>
-                <span className="absolute -bottom-6 -left-3 grid h-28 w-28 place-items-center rounded-full bg-[var(--md-sys-color-primary)] text-center text-xs font-bold tracking-widest text-white uppercase" aria-hidden="true">{lead.designation.split(" ").slice(0, 2).join(" ")}</span>
-              </div>
-              <div>
-                <h3 className="display-small">{lead.displayName}</h3>
-                <p className="title-medium mt-2 text-[var(--md-sys-color-primary)]">{lead.designation}</p>
-                {lead.bio ? <p className="body-large mt-4 text-[var(--color-ink-muted)]">{lead.bio}</p> : null}
-                <div className="mt-7 flex flex-wrap items-center gap-4">
-                  <Link href={`/team/${lead.slug}`} className="btn btn-primary">Meet {lead.displayName.split(" ")[0] === "Dr" ? lead.displayName : lead.displayName.split(" ")[0]}</Link>
-                  <Link href="/book" className="btn btn-text">Request appointment <ArrowRight size={18} aria-hidden="true" /></Link>
-                </div>
-              </div>
+          <div className="flex flex-wrap items-end justify-between gap-6" data-reveal>
+            <div className="max-w-2xl">
+              <p className="eyebrow">Our clinicians</p>
+              <h2 id="team-h" className="headline-large mt-2">Meet the team who keeps you moving</h2>
+              <p className="body-large mt-4 text-[var(--color-ink-muted)]">One-to-one care from clinicians who take the time to understand your goals — whether that&apos;s climbing stairs without pain or getting back on the field.</p>
             </div>
-          ) : null}
+            <Link href="/team" className="link-arrow text-[var(--color-ink)]">View all profiles <ArrowRight size={18} aria-hidden="true" /></Link>
+          </div>
+          <ul className="mt-12 grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-8 lg:grid-cols-3 lg:gap-y-12">
+            {[
+              { key: "lead", href: "/about#doctor-h", photo: "/images/team/dr-nitin-sunku.webp", name: ORTHO.name, role: "Orthopaedic & sports-medicine surgeon", tag: "Clinical lead" as string | null },
+              ...team.map((t) => ({ key: t.id, href: `/team/${t.slug}`, photo: t.photo, name: t.displayName, role: t.designation, tag: null as string | null })),
+            ].map((m, i) => (
+              <li key={m.key} className={i === 0 ? "col-span-2 lg:col-span-1" : undefined} data-reveal={String(i * 80)}>
+                <Link href={m.href} className="group flex h-full flex-col no-underline">
+                  <span className={`relative block overflow-hidden rounded-[var(--md-sys-shape-lg)] ${i === 0 ? "aspect-[4/3] sm:aspect-[16/10] lg:aspect-[4/5]" : "aspect-[4/5]"} bg-[var(--md-sys-color-surface-container)] shadow-[0_1px_2px_rgb(0_0_0/0.06),0_8px_24px_-12px_rgb(0_0_0/0.18)]`}>
+                    {m.photo ? (
+                      <Image src={m.photo} alt={`${m.name}, ${m.role}`} fill sizes={i === 0 ? "(min-width: 1024px) 33vw, 100vw" : "(min-width: 1024px) 33vw, 50vw"} className="object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.03]" />
+                    ) : (
+                      <span className="font-display absolute inset-0 grid place-items-center text-[5rem] leading-none text-[var(--md-sys-color-on-secondary-container)]" aria-hidden="true">{m.name.replace(/^Dr\.? /, "").split(" ").map((p) => p[0]).slice(0, 2).join("")}</span>
+                    )}
+                    {m.tag ? <span className="absolute bottom-4 left-4 rounded-full bg-white/90 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-[0.12em] text-[var(--color-ink)] uppercase backdrop-blur-sm" aria-hidden="true">{m.tag}</span> : null}
+                  </span>
+                  <span className="headline-small mt-4 text-[1.1875rem] text-[var(--color-ink)] sm:mt-5 sm:text-[1.5rem]">{m.name}</span>
+                  <span className="body-medium mt-1 text-[var(--color-ink-muted)]">{m.role}</span>
+                  <span className="title-small mt-4 inline-flex items-center gap-1.5 text-[var(--md-sys-color-primary)]">View profile <ArrowRight size={16} className="transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true" /></span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
@@ -161,14 +175,14 @@ export default async function HomePage() {
             <div className="band on-band flex flex-col justify-center gap-5 p-10 sm:p-14">
               <h2 id="clinic-h" className="headline-large">Designed for your recovery</h2>
               <p className="body-large muted">A treatment space with room to move, train and recover — on 24th Main Road, HSR Layout.</p>
-              {hours.length ? <p className="body-medium">Mon–Sat · {dayHours(hours, 1)}</p> : null}
+              {hours.length ? <p className="body-medium">{hoursSummary(hours)}</p> : null}
               <div className="flex flex-wrap gap-3 pt-2">
                 <Link href="/contact#visit" className="btn btn-on-band">Hours &amp; directions</Link>
                 {phone ? <a href={telHref(phone)} className="btn btn-ghost-light"><Phone size={18} aria-hidden="true" /> {displayPhone(phone)}</a> : null}
               </div>
             </div>
             <figure className="relative m-0">
-              <MediaPanel icon="Dumbbell" index={1} src="/images/stock/clinic-in.webp" alt="A woman doing a floor exercise on a mat" sizes="(min-width: 768px) 50vw, 100vw" className="curve-br h-full min-h-[22rem]" />
+              <MediaPanel icon="Dumbbell" index={1} src="/images/stock/pain-in3.webp" alt="A physiotherapist treating a patient's neck in a treatment room" sizes="(min-width: 768px) 50vw, 100vw" className="curve-br h-full min-h-[22rem]" />
               <figcaption className="body-small absolute top-3 right-3 rounded-[var(--md-sys-shape-sm)] bg-black/55 px-2 py-1 text-white">Illustrative photo</figcaption>
             </figure>
           </div>
@@ -194,7 +208,7 @@ export default async function HomePage() {
               { n: "10", suf: "+", l: "years in orthopaedics & sports medicine", note: "Dr Sunku's clinical experience" },
               { n: "10K", suf: "+", l: "patients consulted", note: "by Dr Sunku across his practice" },
               { n: String(sessionMins), suf: " min", l: "one-to-one, every visit", note: "never a shared or group session" },
-              { n: String(openDays || 6), suf: " days", l: "a week, morning and evening", note: hours.length ? `Mon–Sat · ${dayHours(hours, 1)}` : "call for today's hours" },
+              { n: String(openDays || 6), suf: " days", l: openDays === 7 ? "a week, Sunday mornings included" : "a week, morning and evening", note: hours.length ? hoursSummary(hours) : "call for today's hours" },
             ].map((x, i) => (
               <div key={x.l} className="border-t-[3px] pt-6" style={{ borderColor: `var(--brand-logo-${["blue", "green", "orange", "blue"][i]})` }} data-reveal={String(i * 80)}>
                 <dt className="sr-only">{x.l}</dt>

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight, Phone, CalendarCheck, MapPin, ChevronDown, Clock } from "lucide-react";
 import { NavDrawer } from "@/components/site/nav-drawer";
 import { getOpeningHours, getPublicBranches, getPublicClinic } from "@/modules/content/public";
-import { telHref, displayPhone, dayHours, groupHours } from "@/lib/format";
+import { telHref, displayPhone, hoursSummary, groupHours } from "@/lib/format";
 import { Logo } from "@/components/site/logo";
 import { RevealRoot } from "@/components/site/reveal";
 import { GoogleAnalytics } from "@/components/site/google-analytics";
@@ -26,7 +26,7 @@ export default async function PublicLayout({ children }: { children: React.React
   const phone = branch?.phone ?? clinic?.phone ?? null;
   const name = clinic?.tradeName ?? "Physio Central";
   const area = branch?.locality ? branch.locality.replace(/,.*$/, "") : "Bengaluru";
-  const weekdayHours = dayHours(hours, 1);
+  const weekdayHours = hoursSummary(hours);
 
   return (
     <>
@@ -37,7 +37,7 @@ export default async function PublicLayout({ children }: { children: React.React
         <div className="wrap flex min-h-10 items-center justify-between gap-4">
           <span className="flex items-center gap-5">
             <span className="flex items-center gap-2"><MapPin size={14} aria-hidden="true" /> {area}, {branch?.city ?? "Bengaluru"}</span>
-            {weekdayHours ? <span className="hidden items-center gap-2 md:flex"><Clock size={14} aria-hidden="true" /> Mon–Sat · {weekdayHours}</span> : null}
+            {weekdayHours ? <span className="hidden items-center gap-2 md:flex"><Clock size={14} aria-hidden="true" /> {weekdayHours}</span> : null}
           </span>
           <span className="flex items-center gap-6">
             <Link href="/contact#visit" className="hidden text-[var(--md-sys-color-inverse-on-surface)] no-underline hover:underline sm:inline">Patient info</Link>

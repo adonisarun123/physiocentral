@@ -72,3 +72,11 @@ export function groupHours(hours: { weekday: number; opens: string; closes: stri
   }
   return out;
 }
+
+/** One-line opening summary of open days only, e.g. "Mon–Sat 8:30 am – 1:30 pm, 4:00 pm – 9:00 pm · Sun 10:00 am – 1:00 pm". */
+export function hoursSummary(hours: { weekday: number; opens: string; closes: string }[]): string {
+  return groupHours(hours)
+    .filter((g) => g.hours !== "Closed")
+    .map((g) => `${g.days.replace(" – ", "–").replace(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]*day$/, "$1")} ${g.hours}`)
+    .join(" · ");
+}

@@ -11,9 +11,9 @@ Physio Central's premises, staff or patients.
 | hero-in.webp, assess-in.webp | Homepage hero; Initial assessment | https://www.pexels.com/photo/a-doctor-explaining-a-diagnosis-to-a-man-14797760/ (World Sikh Organization of Canada) |
 | postsurg-in2.webp | Post-surgical rehabilitation | https://www.pexels.com/photo/physiotherapist-working-with-patient-leg-14797757/ (World Sikh Organization of Canada) |
 | spine-in.webp | Spine & posture care | https://www.pexels.com/photo/young-man-on-being-examined-by-a-physiotherapist-14797755/ (World Sikh Organization of Canada) |
-| pain-in3.webp | Pain management & manual therapy | https://www.pexels.com/photo/chiroprator-treating-womans-neck-14797752/ (World Sikh Organization of Canada) |
+| pain-in3.webp | Pain management & manual therapy; homepage "Designed for your recovery" (illustrative) | https://www.pexels.com/photo/chiroprator-treating-womans-neck-14797752/ (World Sikh Organization of Canada) |
 | ortho-in.webp | Orthopaedic physiotherapy | https://www.pexels.com/photo/elderly-man-strolling-in-historic-outdoor-park-36992530/ |
 | sports-in.webp | Sports injury rehabilitation | https://www.pexels.com/photo/energetic-marathon-runners-with-bibs-32944991/ |
 | strength-in.webp | Strengthening & functional training | https://www.pexels.com/photo/woman-practicing-yoga-indoors-on-mat-35011657/ |
 | home-in.webp | Home visits | https://www.pexels.com/photo/family-portrait-in-a-lush-outdoor-setting-36560616/ |
-| clinic-in.webp | "Designed for your recovery" (illustrative) | https://www.pexels.com/photo/a-woman-in-yellow-robe-doing-a-yoga-11387453/ |
+| clinic-in.webp | Not currently used (was "Designed for your recovery"; outdoor shot contradicted the treatment-space copy) | https://www.pexels.com/photo/a-woman-in-yellow-robe-doing-a-yoga-11387453/ |
