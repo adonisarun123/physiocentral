@@ -145,7 +145,7 @@ export default async function HomePage() {
           </div>
           <ul className="mt-12 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
             {[
-              { key: "lead", href: "/about#doctor-h", photo: "/images/team/dr-nitin-sunku.webp", name: ORTHO.name, role: "Clinical lead · Orthopaedic & sports-medicine surgeon", tag: "Clinical lead" as string | null },
+              { key: "lead", href: "/about#doctor-h", photo: "/images/team/dr-nitin-sunku.webp", name: ORTHO.name, role: "Orthopaedic & sports-medicine surgeon", tag: "Clinical lead" as string | null },
               ...team.map((t) => ({ key: t.id, href: `/team/${t.slug}`, photo: t.photo, name: t.displayName, role: t.designation, tag: null as string | null })),
             ].map((m, i) => (
               <li key={m.key} data-reveal={String(i * 80)}>
