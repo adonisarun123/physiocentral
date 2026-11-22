@@ -34,6 +34,7 @@ interface ApptRow {
   ends_at: Date;
   buffer_before_minutes: number;
   buffer_after_minutes: number;
+  package_id: string | null;
 }
 
 async function lockAppointment(db: Db, id: string, actor: StaffActor | null): Promise<ApptRow> {
@@ -219,7 +220,8 @@ export async function transitionAppointment(
     await recordStatus(db, appt, rule.to, actor.label, null);
 
     let chargeId: string | null = null;
-    if (rule.to === "COMPLETED") {
+    // Package visits are billed once for the whole package, not per visit.
+    if (rule.to === "COMPLETED" && !appt.package_id) {
       const svc = await q1<{ id: string; name: string; bill_description: string | null; billing_unit: string; unit_price_paise: string | null; rate_bp: number | null; inclusive: boolean | null }>(
         `SELECT s.id, s.name, s.bill_description, s.billing_unit, pv.unit_price_paise, tc.rate_bp, tc.price_inclusive AS inclusive
            FROM service s

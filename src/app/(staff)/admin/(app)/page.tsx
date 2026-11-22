@@ -14,8 +14,11 @@ export default async function Dashboard() {
   const [pending, oldest, today, unpaid, pendingPay, outbox] = await Promise.all([
     q1<{ n: string }>(`SELECT count(*) n FROM appointment WHERE organization_id=$1 AND status='REQUESTED'`, [org]),
     q1<{ hours: number | null }>(`SELECT round(extract(epoch FROM now() - min(created_at)) / 3600)::int AS hours FROM appointment WHERE organization_id=$1 AND status='REQUESTED'`, [org]),
-    q<{ id: string; starts_at: Date; status: string; patient: string; service: string; therapist: string | null }>(
-      `SELECT a.id, a.starts_at, a.status, p.full_name patient, s.name service, t.display_name therapist
+    q<{ id: string; starts_at: Date; status: string; patient: string; service: string; therapist: string | null; pkg_day: number | null; pkg_total: number | null }>(
+      `SELECT a.id, a.starts_at, a.status, p.full_name patient, s.name service, t.display_name therapist,
+              CASE WHEN a.package_id IS NULL THEN NULL ELSE (SELECT count(*)::int FROM appointment x WHERE x.package_id=a.package_id
+                AND x.status NOT IN ('CANCELLED','REJECTED') AND x.starts_at <= a.starts_at) END pkg_day,
+              (SELECT sessions_total FROM patient_package k WHERE k.id=a.package_id) pkg_total
          FROM appointment a JOIN patient p ON p.id=a.patient_id JOIN service s ON s.id=a.service_id LEFT JOIN therapist t ON t.id=a.therapist_id
         WHERE a.organization_id=$1 AND a.status IN ('CONFIRMED','CHECKED_IN','IN_PROGRESS','COMPLETED','NO_SHOW')
           AND (a.starts_at AT TIME ZONE 'Asia/Kolkata')::date = (now() AT TIME ZONE 'Asia/Kolkata')::date
@@ -64,7 +67,8 @@ export default async function Dashboard() {
           <ul className="space-y-2">
             {today.map((a) => (
               <li key={a.id} className="card flex flex-wrap items-center justify-between gap-2">
-                <span><strong>{formatTime(a.starts_at)}</strong> · <Link href={`/admin/appointments/${a.id}`}>{a.patient}</Link> · {a.service} · {a.therapist ?? "Unassigned"}</span>
+                <span><strong>{formatTime(a.starts_at)}</strong> · <Link href={`/admin/appointments/${a.id}`}>{a.patient}</Link> · {a.service} · {a.therapist ?? "Unassigned"}
+                  {a.pkg_total ? <span className="badge ml-2">Package · day {a.pkg_day} of {a.pkg_total}</span> : null}</span>
                 <StatusBadge status={a.status} />
               </li>
             ))}

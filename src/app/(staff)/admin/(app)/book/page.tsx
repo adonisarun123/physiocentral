@@ -9,26 +9,34 @@ import { PatientPicker } from "@/components/admin/patient-picker";
 import { findSlots } from "@/modules/scheduling/availability";
 import { primaryBranch } from "@/modules/clinic/team";
 import { displayPhone, formatDate, formatTime, todayInZone } from "@/lib/format";
-import { staffBookAction } from "../../actions";
+import { packageBookAction, staffBookAction } from "../../actions";
+import { PACKAGES } from "@/content/pricing";
+import { getPackage } from "@/modules/scheduling/packages";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "New booking" };
 
-type SP = { q?: string; patient?: string; service?: string; therapist?: string; date?: string };
+type SP = { q?: string; patient?: string; service?: string; therapist?: string; date?: string; mode?: string; package?: string };
 const UUID = /^[0-9a-f-]{36}$/i;
 
 export default async function StaffBookPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireStaff("APPOINTMENT_ACCEPT");
   const sp = await searchParams;
+  const isPackage = sp.mode === "package" && !sp.package;
   if (!sp.patient) {
-    return (<><PageHeader title="New booking" lead="Phone or walk-in. Confirmed straight away, checked against the same double-booking rules as online requests." />
-      <PatientPicker orgId={actor.organizationId} target="/admin/book" term={(sp.q ?? "").trim()} /></>);
+    return (<><PageHeader title={isPackage ? "Book a package" : "New booking"} lead={isPackage
+        ? "A course of daily sessions (7, 10, 30 days …) at the same time each day, confirmed straight away."
+        : "Phone or walk-in. Confirmed straight away, checked against the same double-booking rules as online requests."} />
+      <PatientPicker orgId={actor.organizationId} target="/admin/book" term={(sp.q ?? "").trim()} extra={isPackage ? "mode=package" : ""} /></>);
   }
   if (!UUID.test(sp.patient)) notFound();
   const patient = await q1<{ id: string; full_name: string; public_ref: string; phone: string | null }>(
     `SELECT p.id, p.full_name, p.public_ref, (SELECT value FROM patient_contact c WHERE c.patient_id=p.id AND c.kind='PHONE' LIMIT 1) phone
        FROM patient p WHERE p.id=$1 AND p.organization_id=$2`, [sp.patient, actor.organizationId]);
   if (!patient) notFound();
+  // Adding one visit to an existing package (e.g. replacing a cancelled day).
+  const pkg = sp.package && UUID.test(sp.package) ? await getPackage(actor.organizationId, sp.package) : null;
+  if (sp.package && (!pkg || pkg.patient_id !== patient.id)) notFound();
   const branch = await primaryBranch(getPool(), actor.organizationId);
   const [services, therapists] = await Promise.all([
     q<{ id: string; name: string; duration_minutes: number }>(`SELECT id, name, duration_minutes FROM service WHERE organization_id=$1 AND status='ACTIVE' AND bookable ORDER BY sort_order, name`, [actor.organizationId]),
@@ -38,14 +46,14 @@ export default async function StaffBookPage({ searchParams }: { searchParams: Pr
   const therapistId = sp.therapist && UUID.test(sp.therapist) ? sp.therapist : "";
   const chosenDate = sp.date && /^\d{4}-\d{2}-\d{2}$/.test(sp.date) ? sp.date : null;
   let date = chosenDate ?? todayInZone(branch.timezone);
-  let slots = serviceId ? await findSlots({ branchId: branch.id, serviceId, therapistId: therapistId || null, date, enforceLeadTime: false }) : [];
+  let slots = serviceId ? await findSlots({ branchId: branch.id, serviceId, therapistId: therapistId || null, date, enforceLeadTime: false, enforceHorizon: !pkg }) : [];
   let jumped = false;
   // No date picked and nothing left today → show the next day that has free times (up to 2 weeks ahead).
   for (let i = 1; !chosenDate && serviceId && !slots.length && i <= 14; i++) {
     const d = new Date(`${todayInZone(branch.timezone)}T12:00:00Z`);
     d.setUTCDate(d.getUTCDate() + i);
     const next = d.toISOString().slice(0, 10);
-    const found = await findSlots({ branchId: branch.id, serviceId, therapistId: therapistId || null, date: next, enforceLeadTime: false });
+    const found = await findSlots({ branchId: branch.id, serviceId, therapistId: therapistId || null, date: next, enforceLeadTime: false, enforceHorizon: !pkg });
     if (found.length) { date = next; slots = found; jumped = true; }
   }
   const names = new Map(therapists.map((t) => [t.id, t.display_name]));
@@ -56,28 +64,57 @@ export default async function StaffBookPage({ searchParams }: { searchParams: Pr
     byTime.set(k, [...(byTime.get(k) ?? []), names.get(s.therapist_id) ?? "—"]);
   }
 
+  const keep = (extra: Record<string, string>) => {
+    const u = new URLSearchParams({ patient: patient.id, ...(serviceId ? { service: serviceId } : {}), ...(therapistId ? { therapist: therapistId } : {}), ...(chosenDate ? { date: chosenDate } : {}), ...extra });
+    return `/admin/book?${u.toString()}`;
+  };
+
   return (
     <>
-      <p className="mb-2 text-sm"><Link href="/admin/book">← Choose a different patient</Link></p>
-      <PageHeader title="New booking" lead={<>For <Link href={`/admin/patients/${patient.id}`} className="font-semibold">{patient.full_name}</Link> · {patient.phone ? displayPhone(patient.phone) : "no phone"}</>} />
+      <p className="mb-2 text-sm"><Link href={isPackage ? "/admin/book?mode=package" : "/admin/book"}>← Choose a different patient</Link></p>
+      <PageHeader title={pkg ? "Add a package session" : isPackage ? "Book a package" : "New booking"} lead={<>For <Link href={`/admin/patients/${patient.id}`} className="font-semibold">{patient.full_name}</Link> · {patient.phone ? displayPhone(patient.phone) : "no phone"}</>} />
+      {pkg ? (
+        <div className="mb-4"><Notice>Adding a session to <Link href={`/admin/packages/${pkg.id}`} className="font-semibold">{pkg.name}</Link> ({pkg.done + pkg.upcoming + pkg.no_show} of {pkg.sessions_total} used). It won&apos;t be charged separately.</Notice></div>
+      ) : (
+        <nav aria-label="Booking type" className="mb-4 flex flex-wrap gap-2">
+          <Link href={keep({})} aria-current={!isPackage ? "page" : undefined} className={`btn btn-sm ${!isPackage ? "btn-primary" : "btn-secondary"}`}>Single visit</Link>
+          <Link href={keep({ mode: "package" })} aria-current={isPackage ? "page" : undefined} className={`btn btn-sm ${isPackage ? "btn-primary" : "btn-secondary"}`}>Package (7 / 10 / 30 days …)</Link>
+        </nav>
+      )}
       <section className="card">
         <form className="flex flex-wrap items-end gap-3" action="/admin/book">
           <input type="hidden" name="patient" value={patient.id} />
+          {isPackage ? <input type="hidden" name="mode" value="package" /> : null}
+          {pkg ? <input type="hidden" name="package" value={pkg.id} /> : null}
           <div><label className="field-label" htmlFor="b-s">Service</label>
             <select id="b-s" name="service" defaultValue={serviceId} className="input">{services.map((s) => <option key={s.id} value={s.id}>{s.name} ({s.duration_minutes} min)</option>)}</select></div>
           <div><label className="field-label" htmlFor="b-t">Physiotherapist</label>
             <select id="b-t" name="therapist" defaultValue={therapistId} className="input"><option value="">Any available</option>{therapists.map((t) => <option key={t.id} value={t.id}>{t.display_name}</option>)}</select></div>
-          <div><label className="field-label" htmlFor="b-d">Date</label><input id="b-d" name="date" type="date" defaultValue={date} min={todayInZone(branch.timezone)} className="input" /></div>
+          <div><label className="field-label" htmlFor="b-d">{isPackage ? "First day" : "Date"}</label><input id="b-d" name="date" type="date" defaultValue={date} min={todayInZone(branch.timezone)} className="input" /></div>
           <button className="btn btn-secondary">Show free times</button>
         </form>
       </section>
 
       <section className="card mt-6">
-        <h2 className="text-lg font-bold">Free times · {formatDate(`${date}T06:00:00Z`)}</h2>
+        <h2 className="text-lg font-bold">{isPackage ? "Daily time, starting" : "Free times"} · {formatDate(`${date}T06:00:00Z`)}</h2>
+        {isPackage ? <p className="text-sm text-[var(--color-ink-muted)]">Pick the time for day 1. The following sessions are booked at the same time each day the clinic is open; any day that time isn&apos;t free is skipped and you&apos;ll be told which.</p> : null}
         {jumped ? <p className="text-sm text-[var(--color-ink-muted)]">Nothing left today, so this shows the next day with free times.</p> : null}
         {!byTime.size ? <div className="mt-2"><Notice tone="warn">No free times on this date for this service{therapistId ? " and physiotherapist" : ""}. Try another date or &quot;Any available&quot;. (Holidays, leave and existing bookings are excluded.)</Notice></div> : (
-          <ActionForm action={staffBookAction} className="mt-3">
+          <ActionForm action={isPackage ? packageBookAction : staffBookAction} className="mt-3">
             <input type="hidden" name="patientId" value={patient.id} /><input type="hidden" name="serviceId" value={serviceId} /><input type="hidden" name="therapistId" value={therapistId} />
+            {pkg ? <input type="hidden" name="packageId" value={pkg.id} /> : null}
+            {isPackage ? (
+              <fieldset className="mb-4 flex flex-wrap items-end gap-3">
+                <legend className="field-label">Package</legend>
+                <div><label className="sr-only" htmlFor="b-pk">Package</label>
+                  <select id="b-pk" name="plan" className="input" defaultValue={PACKAGES[0] ? `${PACKAGES[0].sessions}|${PACKAGES[0].name}|${PACKAGES[0].amount}` : "custom"}>
+                    {PACKAGES.filter((x) => x.sessions).map((x) => <option key={x.name} value={`${x.sessions}|${x.name}|${x.amount}`}>{x.name} · {x.sessions} sessions · ₹{x.amount.toLocaleString("en-IN")}</option>)}
+                    <option value="custom">Custom number of sessions…</option>
+                  </select></div>
+                <div><label className="field-label" htmlFor="b-cs">Sessions (custom)</label><input id="b-cs" name="customSessions" type="number" min={1} max={60} className="input w-28" /></div>
+                <div><label className="field-label" htmlFor="b-cp">Price ₹ (custom, optional)</label><input id="b-cp" name="customPrice" inputMode="decimal" className="input w-36" /></div>
+              </fieldset>
+            ) : null}
             <fieldset><legend className="sr-only">Choose a time</legend>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
                 {[...byTime.entries()].map(([t, who], i) => (
@@ -96,7 +133,7 @@ export default async function StaffBookPage({ searchParams }: { searchParams: Pr
               <div className="min-w-64 flex-1"><label className="field-label" htmlFor="b-r">Reason / note (optional)</label><input id="b-r" name="reason" maxLength={500} className="input" /></div>
             </div>
             <p className="field-hint mt-2">{therapistId ? "" : "With \"Any available\", the first free physiotherapist at that time is assigned."}</p>
-            <div className="mt-3"><SubmitButton>Confirm booking</SubmitButton></div>
+            <div className="mt-3"><SubmitButton>{isPackage ? "Book package" : "Confirm booking"}</SubmitButton></div>
           </ActionForm>
         )}
       </section>

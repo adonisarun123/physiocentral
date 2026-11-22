@@ -10,7 +10,7 @@ import { acceptAppointment, cancelAppointment, rejectAppointment, transitionAppo
 import { addEstimateLine, createEstimate, decideEstimate, markEstimateLinePerformed, removeEstimateLine, reviseEstimate, sendEstimateVersion } from "@/modules/billing/estimates";
 import { createDirectInvoice, createDraftInvoice, discardDraftInvoice, issueInvoice } from "@/modules/billing/invoices";
 import { createPatient, updatePatient } from "@/modules/patients/admin";
-import { createStaffBooking } from "@/modules/scheduling/staff-booking";
+import { createPackageBooking, createStaffBooking, setPackageStatus } from "@/modules/scheduling/staff-booking";
 import { createStaffLogin, resetStaffPassword, setStaffActive, updateStaff } from "@/modules/staff/admin";
 import { allocatePayment, recordManualPayment, verifyPayment } from "@/modules/payments/manual";
 import { addPriceVersion, createService, setServiceStatus, updateServiceDetails } from "@/modules/catalog/admin";
@@ -246,11 +246,12 @@ export async function removeTimeOffAction(_: ActionResult, fd: FormData) {
 // ───────────── Patients, staff booking, direct invoices ─────────────
 /** Only allow redirects back into the admin area. */
 const safeNext = (v: string) => (/^\/admin\/[a-z/-]*(\?[\w=&%-]*)?$/i.test(v) ? v : "");
+const profile = (fd: FormData) => ({ age: s(fd, "age"), sex: s(fd, "sex"), address: s(fd, "address"), diagnosis: s(fd, "diagnosis"), treatmentProtocol: s(fd, "treatmentProtocol") });
 
 export async function createPatientAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   let id: string | null = null;
   const res = await run(async (a, cid) => {
-    const r = await createPatient(a, { fullName: s(fd, "fullName"), phone: s(fd, "phone"), email: s(fd, "email"), isNewPatient: true, allowDuplicate: fd.get("allowDuplicate") === "on" }, cid);
+    const r = await createPatient(a, { fullName: s(fd, "fullName"), phone: s(fd, "phone"), email: s(fd, "email"), ...profile(fd), isNewPatient: true, allowDuplicate: fd.get("allowDuplicate") === "on" }, cid);
     id = r.patientId;
   }, ["/admin/patients"]);
   if (res?.ok && id) {
@@ -262,7 +263,7 @@ export async function createPatientAction(_: ActionResult, fd: FormData): Promis
 
 export async function updatePatientAction(_: ActionResult, fd: FormData) {
   return run(async (a, cid) => {
-    await updatePatient(a, { patientId: s(fd, "patientId"), fullName: s(fd, "fullName"), phone: s(fd, "phone"), email: s(fd, "email") }, cid);
+    await updatePatient(a, { patientId: s(fd, "patientId"), fullName: s(fd, "fullName"), phone: s(fd, "phone"), email: s(fd, "email"), ...profile(fd) }, cid);
     return "Patient details saved.";
   }, [`/admin/patients/${s(fd, "patientId")}`, "/admin/patients"]);
 }
@@ -273,11 +274,48 @@ export async function staffBookAction(_: ActionResult, fd: FormData): Promise<Ac
     const r = await createStaffBooking(a, {
       patientId: s(fd, "patientId"), serviceId: s(fd, "serviceId"), therapistId: s(fd, "therapistId") || null,
       startsAt: s(fd, "startsAt"), source: s(fd, "source") === "WALK_IN" ? "WALK_IN" : "PHONE", reason: s(fd, "reason"),
+      packageId: s(fd, "packageId") || null,
     }, cid);
     id = r.appointmentId;
-  }, ["/admin", "/admin/calendar", `/admin/patients/${s(fd, "patientId")}`]);
-  if (res?.ok && id) redirect(`/admin/appointments/${id}?booked=1`);
+  }, ["/admin", "/admin/calendar", "/admin/packages", `/admin/patients/${s(fd, "patientId")}`]);
+  if (res?.ok && id) redirect(s(fd, "packageId") ? `/admin/packages/${s(fd, "packageId")}` : `/admin/appointments/${id}?booked=1`);
   return res;
+}
+
+/** "Book as package": `plan` is "<sessions>|<name>|<price rupees>" from the package list, or "custom". */
+export async function packageBookAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
+  let id: string | null = null;
+  let note = "";
+  const res = await run(async (a, cid) => {
+    const plan = s(fd, "plan");
+    let sessions: number, name: string, price: number | null;
+    if (plan === "custom") {
+      sessions = n(fd, "customSessions");
+      name = `${sessions}-session package`;
+      price = s(fd, "customPrice") ? Math.round(Number(s(fd, "customPrice")) * 100) : null;
+      if (price !== null && !Number.isFinite(price)) throw new DomainError("VALIDATION", "Enter a valid package price in rupees.");
+    } else {
+      const [cnt, label, rupees] = plan.split("|");
+      sessions = Number(cnt); name = label ?? ""; price = rupees ? Math.round(Number(rupees) * 100) : null;
+    }
+    const r = await createPackageBooking(a, {
+      patientId: s(fd, "patientId"), serviceId: s(fd, "serviceId"), therapistId: s(fd, "therapistId") || null,
+      startsAt: s(fd, "startsAt"), source: s(fd, "source") === "WALK_IN" ? "WALK_IN" : "PHONE", reason: s(fd, "reason"),
+      name, sessions, pricePaise: price,
+    }, cid);
+    id = r.packageId;
+    note = r.booked < r.sessions ? `&short=${r.sessions - r.booked}` : "";
+  }, ["/admin", "/admin/calendar", "/admin/packages", `/admin/patients/${s(fd, "patientId")}`]);
+  if (res?.ok && id) redirect(`/admin/packages/${id}?booked=1${note}`);
+  return res;
+}
+
+export async function packageStatusAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const status = s(fd, "status") === "ACTIVE" ? "ACTIVE" : "CLOSED";
+    await setPackageStatus(a, { packageId: s(fd, "packageId"), status }, cid);
+    return status === "CLOSED" ? "Package closed." : "Package reopened.";
+  }, ["/admin/packages", `/admin/packages/${s(fd, "packageId")}`]);
 }
 
 export async function directInvoiceAction(_: ActionResult, fd: FormData): Promise<ActionResult> {

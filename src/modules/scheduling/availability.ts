@@ -7,6 +7,7 @@ export interface SlotQuery {
   date?: string | null;        // YYYY-MM-DD in branch local time
   exactStart?: string | null;  // ISO instant, validate a single slot
   enforceLeadTime: boolean;    // patient requests: yes; staff acceptance: only "not in the past"
+  enforceHorizon?: boolean;    // default true; staff package bookings may run past the online booking window
 }
 
 export interface Slot {
@@ -66,7 +67,7 @@ SELECT c.therapist_id, c.resource_id, c.starts_at, c.ends_at
  WHERE ($5::timestamptz IS NULL OR c.starts_at = $5::timestamptz)
    AND c.starts_at > now()
    AND (NOT $6::boolean OR c.starts_at >= now() + make_interval(mins => p.lead))
-   AND c.starts_at < now() + make_interval(days => p.horizon)
+   AND (NOT $7::boolean OR c.starts_at < now() + make_interval(days => p.horizon))
    AND NOT EXISTS (
          SELECT 1 FROM resource_reservation rr
           WHERE rr.resource_id = c.resource_id
@@ -86,6 +87,7 @@ SELECT c.therapist_id, c.resource_id, c.starts_at, c.ends_at
       params.date ?? null,
       params.exactStart ?? null,
       params.enforceLeadTime,
+      params.enforceHorizon ?? true,
     ],
     db,
   );
