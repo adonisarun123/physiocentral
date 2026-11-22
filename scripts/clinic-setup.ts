@@ -11,9 +11,9 @@ import { SERVICES } from "./content/services";
 const MAP_URL = "https://www.google.com/maps/search/?api=1&query=" +
   encodeURIComponent("#1181, 24th Main Rd, behind Maramma temple, Garden Layout, Sector 2, HSR Layout, Bengaluru, Karnataka 560102");
 
-// Mon–Sat, 09:00–13:00 and 16:00–20:00 (Postgres DOW: 0 = Sunday)
-const HOURS: [number, string, string][] = [];
-for (let d = 1; d <= 6; d++) HOURS.push([d, "09:00", "13:00"], [d, "16:00", "20:00"]);
+// Mon–Sat 08:30–13:30 and 16:00–21:00; Sunday 10:00–13:00 (Postgres DOW: 0 = Sunday). Updated Nov 2026.
+const HOURS: [number, string, string][] = [[0, "10:00", "13:00"]];
+for (let d = 1; d <= 6; d++) HOURS.push([d, "08:30", "13:30"], [d, "16:00", "21:00"]);
 
 async function main() {
   const url = process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL;
@@ -58,7 +58,7 @@ async function main() {
     for (const [d, s, e] of HOURS) {
       await c.query(`INSERT INTO availability_rule (resource_id, branch_id, weekday, start_local, end_local) VALUES ($1,$2,$3,$4,$5)`, [th.resource_id, branch.id, d, s, e]);
     }
-    console.log("= opening hours Mon–Sat 09:00–13:00, 16:00–20:00");
+    console.log("= opening hours Mon–Sat 08:30–13:30, 16:00–21:00; Sun 10:00–13:00");
 
     const CATEGORIES: [string, string, number][] = [
       ["Assessment", "assessment", 0], ["Orthopaedic", "orthopaedic", 1], ["Post-surgical", "post-surgical", 2],
@@ -114,7 +114,7 @@ async function main() {
     await c.query(
       `INSERT INTO audit_event (organization_id, actor, action, target_type, target_id, changes)
        VALUES ($1::uuid,'system:clinic-setup','clinic.configure','organization',$1::text,$2)`,
-      [org.id, JSON.stringify({ hours: "Mon-Sat 09-13,16-20", clinician: "Dr Nitin Sunku", services: SERVICES.length })],
+      [org.id, JSON.stringify({ hours: "Mon-Sat 0830-1330,16-21; Sun 10-13", clinician: "Dr Nitin Sunku", services: SERVICES.length })],
     );
     await c.query("COMMIT");
   } catch (e) {
