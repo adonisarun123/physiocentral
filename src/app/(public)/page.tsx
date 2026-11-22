@@ -122,11 +122,11 @@ export default async function HomePage() {
         <div className="wrap">
           <div className="max-w-2xl" data-reveal>
             <h2 id="hurt-h" className="headline-large">Not sure which service you need?</h2>
-            <p className="body-large mt-4 text-[var(--color-ink-muted)]">Start with where it hurts. Every option leads to an assessment, and your physiotherapist examines you before recommending any treatment.</p>
+            <p className="body-large mt-4 text-[var(--color-ink-muted)]">Start with where it hurts. Each one explains how we treat it. Every visit starts with an assessment, and your physiotherapist examines you before recommending any treatment.</p>
           </div>
           <ul className="mt-8 flex flex-wrap gap-3" data-reveal="80">
             {BODY_AREAS.map((a) => (
-              <li key={a.key}><Link href="/book" className="chip state min-h-12 rounded-[var(--md-sys-shape-sm)] px-4 text-[0.9375rem] text-[var(--color-ink)] no-underline">{a.label}</Link></li>
+              <li key={a.key}><Link href={services.some((x) => x.slug === a.service) ? `/services/${a.service}` : "/services"} className="chip state min-h-12 rounded-[var(--md-sys-shape-sm)] px-4 text-[0.9375rem] text-[var(--color-ink)] no-underline">{a.label}</Link></li>
             ))}
           </ul>
         </div>
@@ -143,22 +143,22 @@ export default async function HomePage() {
             </div>
             <Link href="/team" className="link-arrow text-[var(--color-ink)]">View all profiles <ArrowRight size={18} aria-hidden="true" /></Link>
           </div>
-          <ul className="mt-12 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-12 grid grid-cols-2 gap-x-4 gap-y-10 sm:gap-x-8 lg:grid-cols-3 lg:gap-y-12">
             {[
               { key: "lead", href: "/about#doctor-h", photo: "/images/team/dr-nitin-sunku.webp", name: ORTHO.name, role: "Orthopaedic & sports-medicine surgeon", tag: "Clinical lead" as string | null },
               ...team.map((t) => ({ key: t.id, href: `/team/${t.slug}`, photo: t.photo, name: t.displayName, role: t.designation, tag: null as string | null })),
             ].map((m, i) => (
-              <li key={m.key} data-reveal={String(i * 80)}>
+              <li key={m.key} className={i === 0 ? "col-span-2 lg:col-span-1" : undefined} data-reveal={String(i * 80)}>
                 <Link href={m.href} className="group flex h-full flex-col no-underline">
-                  <span className="relative block aspect-[4/5] overflow-hidden rounded-[var(--md-sys-shape-lg)] bg-[var(--md-sys-color-surface-container)] shadow-[0_1px_2px_rgb(0_0_0/0.06),0_8px_24px_-12px_rgb(0_0_0/0.18)]">
+                  <span className={`relative block overflow-hidden rounded-[var(--md-sys-shape-lg)] ${i === 0 ? "aspect-[4/3] sm:aspect-[16/10] lg:aspect-[4/5]" : "aspect-[4/5]"} bg-[var(--md-sys-color-surface-container)] shadow-[0_1px_2px_rgb(0_0_0/0.06),0_8px_24px_-12px_rgb(0_0_0/0.18)]`}>
                     {m.photo ? (
-                      <Image src={m.photo} alt={`${m.name}, ${m.role}`} fill sizes="(min-width: 1024px) 33vw, (min-width: 640px) 50vw, 100vw" className="object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.03]" />
+                      <Image src={m.photo} alt={`${m.name}, ${m.role}`} fill sizes={i === 0 ? "(min-width: 1024px) 33vw, 100vw" : "(min-width: 1024px) 33vw, 50vw"} className="object-cover object-top transition-transform duration-500 ease-out group-hover:scale-[1.03]" />
                     ) : (
                       <span className="font-display absolute inset-0 grid place-items-center text-[5rem] leading-none text-[var(--md-sys-color-on-secondary-container)]" aria-hidden="true">{m.name.replace(/^Dr\.? /, "").split(" ").map((p) => p[0]).slice(0, 2).join("")}</span>
                     )}
                     {m.tag ? <span className="absolute bottom-4 left-4 rounded-full bg-white/90 px-3 py-1.5 text-[0.6875rem] font-semibold tracking-[0.12em] text-[var(--color-ink)] uppercase backdrop-blur-sm" aria-hidden="true">{m.tag}</span> : null}
                   </span>
-                  <span className="headline-small mt-5 text-[var(--color-ink)]">{m.name}</span>
+                  <span className="headline-small mt-4 text-[1.1875rem] text-[var(--color-ink)] sm:mt-5 sm:text-[1.5rem]">{m.name}</span>
                   <span className="body-medium mt-1 text-[var(--color-ink-muted)]">{m.role}</span>
                   <span className="title-small mt-4 inline-flex items-center gap-1.5 text-[var(--md-sys-color-primary)]">View profile <ArrowRight size={16} className="transition-transform duration-300 group-hover:translate-x-1" aria-hidden="true" /></span>
                 </Link>
@@ -182,7 +182,7 @@ export default async function HomePage() {
               </div>
             </div>
             <figure className="relative m-0">
-              <MediaPanel icon="Dumbbell" index={1} src="/images/stock/clinic-in.webp" alt="A woman doing a floor exercise on a mat" sizes="(min-width: 768px) 50vw, 100vw" className="curve-br h-full min-h-[22rem]" />
+              <MediaPanel icon="Dumbbell" index={1} src="/images/stock/pain-in3.webp" alt="A physiotherapist treating a patient's neck in a treatment room" sizes="(min-width: 768px) 50vw, 100vw" className="curve-br h-full min-h-[22rem]" />
               <figcaption className="body-small absolute top-3 right-3 rounded-[var(--md-sys-shape-sm)] bg-black/55 px-2 py-1 text-white">Illustrative photo</figcaption>
             </figure>
           </div>
