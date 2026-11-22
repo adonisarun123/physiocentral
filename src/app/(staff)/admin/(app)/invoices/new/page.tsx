@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "New invoice" };
 const ROWS = 6;
 
-export default async function NewInvoicePage({ searchParams }: { searchParams: Promise<{ q?: string; patient?: string }> }) {
+export default async function NewInvoicePage({ searchParams }: { searchParams: Promise<{ q?: string; patient?: string; desc?: string; price?: string }> }) {
   const actor = await requireStaff("INVOICE_DRAFT");
   const sp = await searchParams;
   if (!sp.patient) {
@@ -23,6 +23,9 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
   if (!/^[0-9a-f-]{36}$/i.test(sp.patient)) notFound();
   const p = await q1<{ id: string; full_name: string; public_ref: string }>(`SELECT id, full_name, public_ref FROM patient WHERE id=$1 AND organization_id=$2`, [sp.patient, actor.organizationId]);
   if (!p) notFound();
+  // Optional prefill for line 1, e.g. from "Bill this package".
+  const preDesc = (sp.desc ?? "").slice(0, 200);
+  const prePrice = /^\d+(\.\d{1,2})?$/.test(sp.price ?? "") ? sp.price! : "";
   const [services, unbilled] = await Promise.all([
     q<{ id: string; name: string; price: string | null }>(
       `SELECT s.id, s.name, (SELECT unit_price_paise::text FROM service_price_version v WHERE v.service_id=s.id AND v.branch_id IS NULL AND v.valid_during @> now() LIMIT 1) price
@@ -45,9 +48,9 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
                 {Array.from({ length: ROWS }, (_, i) => (
                   <tr key={i}>
                     <td><select aria-label={`Line ${i + 1} service`} name={`l${i}service`} className="input min-w-52"><option value="">— custom item —</option>{services.map((s) => <option key={s.id} value={s.id}>{s.name}{s.price ? ` · ${formatINR(s.price)}` : ""}</option>)}</select></td>
-                    <td><input aria-label={`Line ${i + 1} description`} name={`l${i}desc`} className="input min-w-52" placeholder={i === 0 ? "e.g. 10-session package, knee brace" : ""} /></td>
+                    <td><input aria-label={`Line ${i + 1} description`} name={`l${i}desc`} defaultValue={i === 0 ? preDesc : undefined} className="input min-w-52" placeholder={i === 0 ? "e.g. 10-session package, knee brace" : ""} /></td>
                     <td><input aria-label={`Line ${i + 1} quantity`} name={`l${i}qty`} className="input w-20" inputMode="decimal" placeholder="1" /></td>
-                    <td><input aria-label={`Line ${i + 1} price`} name={`l${i}price`} className="input w-32" inputMode="decimal" placeholder={i === 0 ? "catalog price" : ""} /></td>
+                    <td><input aria-label={`Line ${i + 1} price`} name={`l${i}price`} defaultValue={i === 0 ? prePrice : undefined} className="input w-32" inputMode="decimal" placeholder={i === 0 ? "catalog price" : ""} /></td>
                     <td><input aria-label={`Line ${i + 1} discount`} name={`l${i}disc`} className="input w-28" inputMode="decimal" /></td>
                   </tr>
                 ))}

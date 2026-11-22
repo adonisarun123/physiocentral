@@ -3,6 +3,7 @@ import { searchPatients } from "@/modules/patients/admin";
 import { displayPhone, formatDate } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { createPatientAction } from "@/app/(staff)/admin/actions";
+import { PatientProfileFields } from "./patient-profile-fields";
 
 /**
  * Step 1 of booking / invoicing / payments: find the patient, or register a
@@ -12,7 +13,7 @@ export async function PatientPicker({ orgId, target, term, extra = "" }: { orgId
   const hits = await searchPatients(orgId, term, term ? 25 : 10);
   const join = (p: string) => `${target}?${extra ? `${extra}&` : ""}patient=${p}`;
   return (
-    <div className="grid gap-6 lg:grid-cols-[1fr_22rem]">
+    <div className="grid gap-6 lg:grid-cols-[1fr_26rem]">
       <section className="card">
         <h2 className="text-lg font-bold">Find the patient</h2>
         <form className="mt-3 flex flex-wrap items-end gap-2" role="search" action={target}>
@@ -33,12 +34,14 @@ export async function PatientPicker({ orgId, target, term, extra = "" }: { orgId
         </ul>
       </section>
       <section className="card">
-        <h2 className="text-lg font-bold">New patient</h2>
+        <h2 className="text-lg font-bold">New patient registration</h2>
+        <p className="text-sm text-[var(--color-ink-muted)]">Only name and mobile are required. The rest can be filled in later on the patient record.</p>
         <ActionForm action={createPatientAction} className="mt-3">
           <input type="hidden" name="next" value={`${target}${extra ? `?${extra}` : ""}`} />
           <label className="field-label" htmlFor="np-n">Full name</label><input id="np-n" name="fullName" required className="input mb-3" />
           <label className="field-label" htmlFor="np-p">Mobile</label><input id="np-p" name="phone" required inputMode="tel" className="input mb-3" placeholder="98765 43210" />
           <label className="field-label" htmlFor="np-e">Email (optional)</label><input id="np-e" name="email" type="email" className="input mb-3" />
+          <div className="mb-3"><PatientProfileFields idPrefix="np" compact /></div>
           <label className="mb-3 flex items-center gap-2 text-sm"><input type="checkbox" name="allowDuplicate" className="h-5 w-5" /> Create anyway if the phone already exists (e.g. family member)</label>
           <SubmitButton>Add &amp; continue</SubmitButton>
         </ActionForm>

@@ -19,8 +19,11 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
   const actor = await requireStaff("APPOINTMENT_VIEW");
   const sp = await searchParams;
   const date = /^\d{4}-\d{2}-\d{2}$/.test(sp.date ?? "") ? sp.date! : todayInZone();
-  const rows = await q<{ id: string; starts_at: Date; ends_at: Date; status: string; patient: string; service: string; therapist: string | null; branch: string }>(
-    `SELECT a.id, a.starts_at, a.ends_at, a.status, split_part(p.full_name, ' ', 1) patient, s.name service, t.display_name therapist, b.name branch
+  const rows = await q<{ id: string; starts_at: Date; ends_at: Date; status: string; patient: string; service: string; therapist: string | null; branch: string; pkg_day: number | null; pkg_total: number | null }>(
+    `SELECT a.id, a.starts_at, a.ends_at, a.status, split_part(p.full_name, ' ', 1) patient, s.name service, t.display_name therapist, b.name branch,
+            CASE WHEN a.package_id IS NULL THEN NULL ELSE (SELECT count(*)::int FROM appointment x WHERE x.package_id=a.package_id
+              AND x.status NOT IN ('CANCELLED','REJECTED') AND x.starts_at <= a.starts_at) END pkg_day,
+            (SELECT sessions_total FROM patient_package k WHERE k.id=a.package_id) pkg_total
        FROM appointment a JOIN patient p ON p.id=a.patient_id JOIN service s ON s.id=a.service_id JOIN branch b ON b.id=a.branch_id
        LEFT JOIN therapist t ON t.id=a.therapist_id
       WHERE a.organization_id=$1 AND a.status NOT IN ('REJECTED')
@@ -49,7 +52,8 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
           <ul className="space-y-2">
             {list.map((a) => (
               <li key={a.id} className="card flex flex-wrap items-center justify-between gap-2 py-3">
-                <span><strong>{formatTime(a.starts_at)}–{formatTime(a.ends_at)}</strong> · <Link href={`/admin/appointments/${a.id}`}>{a.patient}</Link> · {a.service} · {a.branch}</span>
+                <span><strong>{formatTime(a.starts_at)}–{formatTime(a.ends_at)}</strong> · <Link href={`/admin/appointments/${a.id}`}>{a.patient}</Link> · {a.service} · {a.branch}
+                  {a.pkg_total ? <span className="badge ml-2">Package · day {a.pkg_day} of {a.pkg_total}</span> : null}</span>
                 <StatusBadge status={a.status} />
               </li>
             ))}

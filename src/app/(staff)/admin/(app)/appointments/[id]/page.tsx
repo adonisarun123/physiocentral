@@ -27,8 +27,10 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
     id: string; public_ref: string; status: string; version: number; starts_at: Date; ends_at: Date; source: string; reason_brief: string | null;
     accessibility_needs: string | null; internal_note: string | null; patient_id: string; patient: string; patient_ref: string; service: string;
     branch: string; timezone: string; therapist: string | null; pref: string | null; contact_verified: boolean;
+    package_id: string | null; package_name: string | null;
   }>(
     `SELECT a.*, p.full_name patient, p.public_ref patient_ref, s.name service, b.name branch, b.timezone,
+            (SELECT name FROM patient_package k WHERE k.id=a.package_id) package_name,
             t.display_name therapist, rt.display_name pref
        FROM appointment a JOIN patient p ON p.id=a.patient_id JOIN service s ON s.id=a.service_id JOIN branch b ON b.id=a.branch_id
        LEFT JOIN therapist t ON t.id=a.therapist_id LEFT JOIN therapist rt ON rt.id=a.requested_therapist_id
@@ -72,7 +74,7 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
 
   return (
     <>
-      <PageHeader title={a.patient} lead={<><span className="font-mono">{a.public_ref}</span> · {a.service} · {formatDateTime(a.starts_at, a.timezone)}</>}>
+      <PageHeader title={a.patient} lead={<><span className="font-mono">{a.public_ref}</span> · {a.service} · {formatDateTime(a.starts_at, a.timezone)}{a.package_id ? <> · <Link href={`/admin/packages/${a.package_id}`}>{a.package_name}</Link></> : null}</>}>
         <StatusBadge status={a.status} />
         {can(actor, "PATIENT_CONTACT_VIEW") ? <Link href={`/admin/patients/${a.patient_id}`} className="btn btn-secondary btn-sm">Patient record</Link> : null}
       </PageHeader>
