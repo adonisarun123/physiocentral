@@ -279,7 +279,7 @@ export const SERVICES: ServiceContent[] = [
       { title: "Review progress", body: "We track progress and move you to clinic visits when you're ready, if you prefer." },
     ],
     faqs: [
-      { q: "Which areas do you cover?", a: "Please call the clinic — we'll confirm whether we can reach your area and when." },
+      { q: "Which areas do you cover?", a: "We visit homes in HSR Layout and nearby areas, including Sarjapur Road (Kaikondrahalli, Haralur), Bellandur, Koramangala, BTM Layout, Bommanahalli and Electronic City. Please call to confirm your address and a convenient time; if you're just outside these areas, ask and we'll tell you whether we can reach you." },
       { q: "Is there an extra charge for home visits?", a: "A travel supplement may apply. We'll tell you the total before confirming the visit." },
       { q: "Do I need any equipment?", a: "Usually not. We'll use what's available at home and advise you if anything simple would help." },
     ],
