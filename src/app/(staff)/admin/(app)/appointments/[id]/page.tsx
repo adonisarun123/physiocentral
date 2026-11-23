@@ -7,7 +7,7 @@ import { can } from "@/modules/auth/actor";
 import { PageHeader, StatusBadge, Notice } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { formatINR } from "@/modules/billing/money";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, patientNumber } from "@/lib/format";
 import { TRANSITIONS } from "@/modules/scheduling/appointments";
 import {
   acceptAction, addEstimateLineAction, cancelAction, createEstimateAction, createInvoiceAction, markPerformedAction,
@@ -25,11 +25,11 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const a = await q1<{
     id: string; public_ref: string; status: string; version: number; starts_at: Date; ends_at: Date; source: string; reason_brief: string | null;
-    accessibility_needs: string | null; internal_note: string | null; patient_id: string; patient: string; patient_ref: string; service: string;
+    accessibility_needs: string | null; internal_note: string | null; patient_id: string; patient: string; patient_ref: string; patient_op: number | null; service: string;
     branch: string; timezone: string; therapist: string | null; pref: string | null; contact_verified: boolean;
     package_id: string | null; package_name: string | null;
   }>(
-    `SELECT a.*, p.full_name patient, p.public_ref patient_ref, s.name service, b.name branch, b.timezone,
+    `SELECT a.*, p.full_name patient, p.public_ref patient_ref, p.op_number patient_op, s.name service, b.name branch, b.timezone,
             (SELECT name FROM patient_package k WHERE k.id=a.package_id) package_name,
             t.display_name therapist, rt.display_name pref
        FROM appointment a JOIN patient p ON p.id=a.patient_id JOIN service s ON s.id=a.service_id JOIN branch b ON b.id=a.branch_id
@@ -39,7 +39,7 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
   );
   if (!a) notFound(); // non-disclosing for other orgs
 
-  const [events, estimates, charges, invoices, catalog, phone] = await Promise.all([
+  const [events, estimates, charges, invoices, catalog, phone, paid, refunds] = await Promise.all([
     q<{ from_status: string | null; to_status: string; actor: string; reason: string | null; created_at: Date }>(
       `SELECT from_status, to_status, actor, reason, created_at FROM appointment_status_event WHERE appointment_id=$1 ORDER BY created_at`, [id]),
     q<{ id: string; estimate_id: string; version_no: number; status: string; total_paise: string; content_hash: string | null; valid_until: Date | null }>(
@@ -56,7 +56,16 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
     can(actor, "PATIENT_CONTACT_VIEW")
       ? q1<{ value: string }>(`SELECT value FROM patient_contact WHERE patient_id=$1 AND kind='PHONE' ORDER BY preferred DESC LIMIT 1`, [a.patient_id])
       : Promise.resolve(undefined),
+    // Verified money on the patient's account that has not been fully paid back.
+    q<{ id: string; amount_paise: string; refunded: string; received_on: string; receipt_number: string | null }>(
+      `SELECT pm.id, pm.amount_paise, f.refunded_paise::text refunded, to_char(pm.received_on,'DD Mon YYYY') received_on, r.number receipt_number
+         FROM payment pm JOIN payment_funds f ON f.payment_id=pm.id LEFT JOIN receipt r ON r.payment_id=pm.id
+        WHERE pm.patient_id=$1 AND pm.status='VERIFIED' AND f.refunded_paise < pm.amount_paise ORDER BY pm.created_at DESC LIMIT 10`, [a.patient_id]),
+    q<{ id: string; number: string; amount_paise: string; approved_by_name: string; refunded_on: string }>(
+      `SELECT id, number, amount_paise, approved_by_name, to_char(refunded_on,'DD Mon YYYY') refunded_on FROM payment_refund WHERE appointment_id=$1 ORDER BY created_at`, [id]),
   ]);
+  const paidTotal = paid.reduce((s, x) => s + BigInt(x.amount_paise) - BigInt(x.refunded), 0n);
+  const closedWithoutVisit = a.status === "CANCELLED" || a.status === "REJECTED";
   const lines = estimates.length
     ? await q<{ id: string; estimate_version_id: string; description: string; quantity: string; total_paise: string; is_extra: boolean; reason: string | null; charge_id: string | null }>(
         `SELECT l.id, l.estimate_version_id, l.description, trim_scale(l.quantity)::text quantity, l.total_paise, l.is_extra, l.reason, c.id charge_id
@@ -86,7 +95,7 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
           <dl className="mt-2 space-y-1">
             <div><dt className="inline font-semibold">Branch: </dt><dd className="inline">{a.branch}</dd></div>
             <div><dt className="inline font-semibold">Therapist: </dt><dd className="inline">{a.therapist ?? `Not assigned (preference: ${a.pref ?? "any"})`}</dd></div>
-            <div><dt className="inline font-semibold">Patient ref: </dt><dd className="inline font-mono">{a.patient_ref}</dd></div>
+            <div><dt className="inline font-semibold">OP number: </dt><dd className="inline font-mono">{a.patient_op != null ? patientNumber({ op_number: a.patient_op, public_ref: a.patient_ref }) : "Not given yet (given when the visit is confirmed)"}</dd></div>
             <div><dt className="inline font-semibold">Phone: </dt><dd className="inline">{phone?.value ?? "Hidden for your role"} {a.contact_verified ? "" : "(unverified)"}</dd></div>
             <div><dt className="inline font-semibold">Source: </dt><dd className="inline">{a.source.toLowerCase()}</dd></div>
             {a.reason_brief ? <div><dt className="inline font-semibold">Reason (patient-entered): </dt><dd className="inline">{a.reason_brief}</dd></div> : null}
@@ -108,9 +117,28 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
                 {hidden}
                 <label htmlFor="reason" className="field-label">Reason (recorded with policy snapshot)</label>
                 <input id="reason" name="reason" required className="input" />
+                {paidTotal > 0n ? <p className="mt-2 text-sm">This patient has {formatINR(paidTotal)} paid on their account. Cancelling does not move any money — after cancelling you can refund it here or leave it as credit for their next visit.</p> : null}
                 <div className="mt-2"><SubmitButton small variant="danger">Confirm cancellation</SubmitButton></div>
               </ActionForm>
             </details>
+          ) : null}
+          {refunds.length ? (
+            <div className="mt-4"><Notice tone="ok" title="Refunded for this appointment">
+              <ul>{refunds.map((r) => (
+                <li key={r.id}>{formatINR(r.amount_paise)} on {r.refunded_on} · <Link href={`/admin/refunds/${r.id}`}>{r.number}</Link> · approved by {r.approved_by_name}</li>
+              ))}</ul>
+            </Notice></div>
+          ) : null}
+          {closedWithoutVisit && paid.length && (can(actor, "PAYMENT_REFUND") || can(actor, "PAYMENT_RECORD")) ? (
+            <div className="mt-4"><Notice tone="warn" title={`${formatINR(paidTotal)} is still on this patient's account`}>
+              <p>This appointment did not go ahead. Refund the money, or leave it as credit for their next visit.</p>
+              <ul className="mt-2 space-y-2">{paid.map((x) => (
+                <li key={x.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <span>{formatINR(BigInt(x.amount_paise) - BigInt(x.refunded))} · received {x.received_on}{x.receipt_number ? ` · ${x.receipt_number}` : ""}{x.refunded !== "0" ? ` · ${formatINR(x.refunded)} already refunded` : ""}</span>
+                  {can(actor, "PAYMENT_REFUND") ? <Link href={`/admin/payments/${x.id}?appointment=${a.id}`} className="btn btn-secondary btn-sm">Refund…</Link> : null}
+                </li>
+              ))}</ul>
+            </Notice></div>
           ) : null}
         </section>
 

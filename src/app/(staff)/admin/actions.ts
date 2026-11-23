@@ -13,6 +13,7 @@ import { createPatient, updatePatient } from "@/modules/patients/admin";
 import { createPackageBooking, createStaffBooking, setPackageStatus } from "@/modules/scheduling/staff-booking";
 import { createStaffLogin, resetStaffPassword, setStaffActive, updateStaff } from "@/modules/staff/admin";
 import { allocatePayment, recordManualPayment, verifyPayment } from "@/modules/payments/manual";
+import { refundPayment, reversePayment } from "@/modules/payments/refunds";
 import { addPriceVersion, createService, setServiceStatus, updateServiceDetails } from "@/modules/catalog/admin";
 import { addTimeOff, createTherapist, removeTimeOff, setTherapistActive, setTherapistHours, setTherapistServices, shiftsFromForm, updateTherapistProfile } from "@/modules/clinic/team";
 
@@ -146,6 +147,27 @@ export async function verifyPaymentAction(_: ActionResult, fd: FormData) {
 export async function allocateAction(_: ActionResult, fd: FormData) {
   return run(async (a, cid) => { await allocatePayment(a, { paymentId: s(fd, "paymentId"), invoiceId: s(fd, "invoiceId"), amountRupees: s(fd, "amountRupees") }, cid); return "Allocated."; },
     [`/admin/invoices/${s(fd, "invoiceId")}`, "/admin/payments"]);
+}
+
+export async function refundPaymentAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const r = await refundPayment(a, {
+      paymentId: s(fd, "paymentId"), amountRupees: s(fd, "amountRupees"), method: s(fd, "method"), refundedOn: s(fd, "refundedOn"),
+      paidFrom: s(fd, "paidFrom"), reference: s(fd, "reference") || undefined, reason: s(fd, "reason"),
+      appointmentId: s(fd, "appointmentId") || undefined, creditBills: fd.get("creditBills") === "on",
+    }, cid);
+    const bills = r.creditNotes.length ? ` Bill reduced by credit note ${r.creditNotes.join(", ")}.`
+      : r.releasedFrom.length ? ` ${r.releasedFrom.join(", ")} is unpaid again for that amount.` : "";
+    return `Refund recorded. Voucher ${r.number}.${bills}`;
+  }, [`/admin/payments/${s(fd, "paymentId")}`, "/admin/payments", "/admin/invoices", `/admin/patients/${s(fd, "patientId")}`,
+      ...(s(fd, "appointmentId") ? [`/admin/appointments/${s(fd, "appointmentId")}`] : [])]);
+}
+
+export async function reversePaymentAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const r = await reversePayment(a, { paymentId: s(fd, "paymentId"), reason: s(fd, "reason") }, cid);
+    return r.releasedFrom.length ? `Entry reversed. ${r.releasedFrom.join(", ")} is unpaid again.` : "Entry reversed.";
+  }, [`/admin/payments/${s(fd, "paymentId")}`, "/admin/payments", "/admin/invoices", `/admin/patients/${s(fd, "patientId")}`]);
 }
 
 export async function addPriceAction(_: ActionResult, fd: FormData) {

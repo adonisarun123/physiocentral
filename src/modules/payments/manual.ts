@@ -4,6 +4,7 @@ import { DomainError } from "@/lib/errors";
 import { audit, enqueue } from "@/modules/audit";
 import { assertPermission, type Actor, type StaffActor } from "@/modules/auth/actor";
 import { financialYear, parseRupeesToPaise } from "@/modules/billing/money";
+import { patientNumber } from "@/lib/format";
 
 export const recordPaymentSchema = z.object({
   patientId: z.string().uuid(),
@@ -100,10 +101,10 @@ async function verifyInTx(db: Db, actor: StaffActor, paymentId: string, allocate
   const allocations = await q<{ invoice_number: string; amount_paise: string }>(
     `SELECT i.number AS invoice_number, a.amount_paise FROM payment_allocation a JOIN invoice i ON i.id=a.invoice_id
       WHERE a.payment_id=$1 AND a.kind='ALLOCATE' ORDER BY a.created_at`, [p.id], db);
-  const patient = (await q1<{ full_name: string; public_ref: string }>(`SELECT full_name, public_ref FROM patient WHERE id=$1`, [p.patient_id], db))!;
+  const patient = (await q1<{ full_name: string; public_ref: string; op_number: number | null }>(`SELECT full_name, public_ref, op_number FROM patient WHERE id=$1`, [p.patient_id], db))!;
   const snapshot = {
     number, issuedAt: new Date().toISOString(), clinic: org.trade_name,
-    receivedFrom: patient.full_name, patientRef: patient.public_ref,
+    receivedFrom: patient.full_name, patientRef: patientNumber(patient),
     kind: "PAYMENT", method: p.method, reference: p.reference, receivedOn: p.received_on,
     amountPaise: p.amount_paise, allocationsAtIssue: allocations,
   };

@@ -1,3 +1,4 @@
+import { patientNumber } from "@/lib/format";
 import { tx, q, q1, pgErrorCode, pgConstraint, type Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { audit, enqueue } from "@/modules/audit";
@@ -189,7 +190,7 @@ export async function issueInvoice(actor: Actor, input: { invoiceId: string; exp
       throw new DomainError("VALIDATION", "Taxed lines require GST registration settings approved by the accountant (§9.3).");
     }
     const docType = !org.gst_registered ? "BILL" : hasTax ? "TAX_INVOICE" : "BILL_OF_SUPPLY";
-    const patient = (await q1<{ full_name: string; public_ref: string }>(`SELECT full_name, public_ref FROM patient WHERE id=$1`, [inv.patient_id], db))!;
+    const patient = (await q1<{ full_name: string; public_ref: string; op_number: number | null }>(`SELECT full_name, public_ref, op_number FROM patient WHERE id=$1`, [inv.patient_id], db))!;
     const branch = inv.appointment_id
       ? await q1<{ name: string; address_line: string | null; city: string | null; phone_e164: string | null; starts_at: Date; public_ref: string }>(
           `SELECT b.name, b.address_line, b.city, b.phone_e164, a.starts_at, a.public_ref FROM appointment a JOIN branch b ON b.id=a.branch_id WHERE a.id=$1`,
@@ -215,7 +216,7 @@ export async function issueInvoice(actor: Actor, input: { invoiceId: string; exp
         phone: org.phone_e164, email: org.email, identityVerified: org.identity_verified,
         branch: branch ? { name: branch.name, address: [branch.address_line, branch.city].filter(Boolean).join(", "), phone: branch.phone_e164 } : null,
       },
-      billTo: { name: patient.full_name, patientRef: patient.public_ref },
+      billTo: { name: patient.full_name, patientRef: patientNumber(patient) },
       service: branch ? { appointmentRef: branch.public_ref, date: new Date(branch.starts_at).toISOString() } : null,
       lines,
       totals: { subtotalPaise: inv.subtotal_paise, taxPaise: inv.tax_paise, totalPaise: inv.total_paise },

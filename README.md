@@ -17,12 +17,14 @@ spec and not production-complete.** The spec estimates 10–14 weeks for two dev
 | Estimates | Draft → freeze/send (content hash) → patient accepts via link or staff records offline with attestation → revise = new version; accepted ≠ performed | triggers freeze sent versions; unique approval per version |
 | Invoices | Draft from billable charges, issue with FY numbering inside the transaction, immutable snapshot, print view | **unique `invoice_line(billable_charge_id)`**; issued-invoice trigger; sequence row lock |
 | Payments | Record (cash / manual UPI / bank), separate verifier role, receipts, allocation ledger, derived UNPAID / PARTIAL / PAID, overpayment stays unallocated credit | append-only `payment_allocation`, `payment` guard trigger, `invoice_balance` view |
+| Refunds | Full or partial refund of a verified payment with a numbered voucher (`RFD/…`) and the approving staff member recorded; money on a bill is taken back and the bill reduced by a credit note (`CN/…`); a mistaken entry is reversed instead (no money moves) | append-only `payment_refund` and `credit_note` with guard triggers (never more than was paid / billed); `payment_funds` and `invoice_balance` views |
+| OP number | Running out-patient number per clinic shown as `OP-0001`; given at front-desk registration, or when an online request first becomes a confirmed visit, bill or payment; searchable | `assign_op_number()` with a per-clinic sequence row; unique index; activity triggers |
 | Auth | Better Auth: staff email + password, DB sessions (HttpOnly, revocable, 12 h), TOTP MFA, invite-only accounts, role presets → permissions, server-side checks in every action | `src/modules/auth` |
 | Ops | Audit log (append-only trigger), transactional outbox, `/api/health`, security headers, `no-store` on private routes | |
 
 ## Not built (stubbed honestly, not faked)
 
-Gateway payments (the webhook returns 501), credit notes and refunds, proposals the patient can accept, rescheduling, deposits and holds, packages, home visits, intake and clinical notes, the CMS workflow, reports and exports, the PDF worker and notification delivery (events queue in `outbox_event`, but no worker sends them), OTP verification for patients, the leave/closure impact workflow, guardians, privacy-request queue.
+Gateway payments (the webhook returns 501), proposals the patient can accept, rescheduling, deposits and holds, packages, home visits, intake and clinical notes, the CMS workflow, reports and exports, the PDF worker and notification delivery (events queue in `outbox_event`, but no worker sends them), OTP verification for patients, the leave/closure impact workflow, guardians, privacy-request queue.
 
 ## Deviations from the spec
 

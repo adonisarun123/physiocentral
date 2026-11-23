@@ -22,10 +22,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     [id, actor.organizationId],
   );
   if (!inv || (!can(actor, "INVOICE_DRAFT") && !can(actor, "FINANCE_VIEW"))) notFound();
-  const [lines, bal, allocations, patientPayments] = await Promise.all([
+  const [lines, bal, allocations, patientPayments, creditNotes] = await Promise.all([
     q<{ description: string; quantity: string; billing_unit: string; unit_price_paise: string; discount_paise: string; tax_paise: string; total_paise: string }>(
       `SELECT description, trim_scale(quantity)::text quantity, billing_unit, unit_price_paise, discount_paise, tax_paise, total_paise FROM invoice_line WHERE invoice_id=$1 ORDER BY sort_order, id`, [id]),
-    q1<{ net_allocated_paise: string }>(`SELECT net_allocated_paise::text FROM invoice_balance WHERE invoice_id=$1`, [id]),
+    q1<{ net_allocated_paise: string; net_liability_paise: string; credited_paise: string }>(`SELECT net_allocated_paise::text, net_liability_paise::text, credited_paise::text FROM invoice_balance WHERE invoice_id=$1`, [id]),
     q<{ amount_paise: string; kind: string; created_at: Date; method: string; reference: string | null; receipt_id: string | null; receipt_number: string | null }>(
       `SELECT a.amount_paise, a.kind, a.created_at, p.method, p.reference, r.id receipt_id, r.number receipt_number
          FROM payment_allocation a JOIN payment p ON p.id=a.payment_id LEFT JOIN receipt r ON r.payment_id=p.id
@@ -33,8 +33,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     q<{ id: string; method: string; amount_paise: string; status: string; reference: string | null; received_on: string; unallocated_paise: string }>(
       `SELECT p.id, p.method, p.amount_paise, p.status, p.reference, to_char(p.received_on,'YYYY-MM-DD') received_on, f.unallocated_paise::text
          FROM payment p JOIN payment_funds f ON f.payment_id=p.id WHERE p.patient_id=$1 AND p.status IN ('PENDING','VERIFIED') ORDER BY p.created_at DESC`, [inv.patient_id]),
+    q<{ number: string; amount_paise: string; reason: string; created_by_name: string; created_at: Date; refund_id: string | null; refund_number: string | null }>(
+      `SELECT c.number, c.amount_paise, c.reason, c.created_by_name, c.created_at, c.refund_id, rf.number refund_number
+         FROM credit_note c LEFT JOIN payment_refund rf ON rf.id=c.refund_id WHERE c.invoice_id=$1 ORDER BY c.created_at`, [id]),
   ]);
-  const balance = inv.status === "ISSUED" ? computeBalance(BigInt(inv.total_paise), BigInt(bal?.net_allocated_paise ?? "0")) : null;
+  const balance = inv.status === "ISSUED" ? computeBalance(BigInt(bal?.net_liability_paise ?? inv.total_paise), BigInt(bal?.net_allocated_paise ?? "0")) : null;
 
   return (
     <>
@@ -60,6 +63,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               <tr><th colSpan={5}>Tax</th><td className="num">{formatINR(inv.tax_paise)}</td></tr>
               <tr><th colSpan={5}>Total</th><td className="num font-bold">{formatINR(inv.total_paise)}</td></tr>
               {balance ? <>
+                {bal && bal.credited_paise !== "0" ? <tr><th colSpan={5}>Less credit notes</th><td className="num">−{formatINR(bal.credited_paise)}</td></tr> : null}
                 <tr><th colSpan={5}>Verified payments applied</th><td className="num">{formatINR(bal?.net_allocated_paise ?? "0")}</td></tr>
                 <tr><th colSpan={5}>Amount due</th><td className="num font-bold">{formatINR(balance.amountDuePaise)}</td></tr>
               </> : null}
@@ -80,7 +84,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             </ActionForm>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-[var(--color-ink-muted)]">Issued documents are immutable. Corrections need a credit note (not available in this release — contact your accountant).</p>
+          <p className="mt-3 text-sm text-[var(--color-ink-muted)]">Issued documents are never edited. When a payment on this bill is refunded, the bill is reduced by a credit note instead.</p>
         )}
       </section>
 
@@ -94,6 +98,15 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                   {a.receipt_id ? <> · <Link href={`/admin/receipts/${a.receipt_id}`}>{a.receipt_number}</Link></> : null}</li>
               ))}</ul>
             )}
+            {creditNotes.length ? (
+              <div className="mt-4">
+                <h3 className="font-semibold">Credit notes</h3>
+                <ul className="mt-1 space-y-1">{creditNotes.map((c) => (
+                  <li key={c.number}>{formatDate(c.created_at)} · {c.number} · −{formatINR(c.amount_paise)} · {c.reason} · by {c.created_by_name}
+                    {c.refund_id ? <> · <Link href={`/admin/refunds/${c.refund_id}`}>{c.refund_number}</Link></> : null}</li>
+                ))}</ul>
+              </div>
+            ) : null}
             {patientPayments.some((p) => p.status === "PENDING" || BigInt(p.unallocated_paise) > 0n) ? (
               <div className="mt-4">
                 <h3 className="font-semibold">Patient funds not yet applied</h3>

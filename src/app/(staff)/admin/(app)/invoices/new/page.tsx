@@ -7,6 +7,7 @@ import { PageHeader, Notice } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { PatientPicker } from "@/components/admin/patient-picker";
 import { formatINR } from "@/modules/billing/money";
+import { patientNumber } from "@/lib/format";
 import { directInvoiceAction } from "../../../actions";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,7 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
       <PatientPicker orgId={actor.organizationId} target="/admin/invoices/new" term={(sp.q ?? "").trim()} /></>);
   }
   if (!/^[0-9a-f-]{36}$/i.test(sp.patient)) notFound();
-  const p = await q1<{ id: string; full_name: string; public_ref: string }>(`SELECT id, full_name, public_ref FROM patient WHERE id=$1 AND organization_id=$2`, [sp.patient, actor.organizationId]);
+  const p = await q1<{ id: string; full_name: string; public_ref: string; op_number: number | null }>(`SELECT id, full_name, public_ref, op_number FROM patient WHERE id=$1 AND organization_id=$2`, [sp.patient, actor.organizationId]);
   if (!p) notFound();
   // Optional prefill for line 1, e.g. from "Bill this package".
   const preDesc = (sp.desc ?? "").slice(0, 200);
@@ -36,7 +37,7 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
   return (
     <>
       <p className="mb-2 text-sm"><Link href="/admin/invoices/new">← Choose a different patient</Link></p>
-      <PageHeader title="New invoice" lead={<>For <Link href={`/admin/patients/${p.id}`} className="font-semibold">{p.full_name}</Link> <span className="font-mono text-sm">{p.public_ref}</span></>} />
+      <PageHeader title="New invoice" lead={<>For <Link href={`/admin/patients/${p.id}`} className="font-semibold">{p.full_name}</Link> <span className="font-mono text-sm">{patientNumber(p)}</span></>} />
       {unbilled[0]?.n ? <div className="mb-4"><Notice tone="warn">This patient has {unbilled[0].n} unbilled visit charge(s). Bill those from the appointment page so they are not charged twice.</Notice></div> : null}
       <section className="card">
         <ActionForm action={directInvoiceAction}>

@@ -8,7 +8,7 @@ import { ActionForm, SubmitButton } from "@/components/action-form";
 import { PatientPicker } from "@/components/admin/patient-picker";
 import { findSlots } from "@/modules/scheduling/availability";
 import { primaryBranch } from "@/modules/clinic/team";
-import { displayPhone, formatDate, formatTime, todayInZone } from "@/lib/format";
+import { displayPhone, formatDate, formatOpNumber, formatTime, todayInZone } from "@/lib/format";
 import { packageBookAction, staffBookAction } from "../../actions";
 import { PACKAGES } from "@/content/pricing";
 import { getPackage } from "@/modules/scheduling/packages";
@@ -30,8 +30,8 @@ export default async function StaffBookPage({ searchParams }: { searchParams: Pr
       <PatientPicker orgId={actor.organizationId} target="/admin/book" term={(sp.q ?? "").trim()} extra={isPackage ? "mode=package" : ""} /></>);
   }
   if (!UUID.test(sp.patient)) notFound();
-  const patient = await q1<{ id: string; full_name: string; public_ref: string; phone: string | null }>(
-    `SELECT p.id, p.full_name, p.public_ref, (SELECT value FROM patient_contact c WHERE c.patient_id=p.id AND c.kind='PHONE' LIMIT 1) phone
+  const patient = await q1<{ id: string; full_name: string; public_ref: string; op_number: number | null; phone: string | null }>(
+    `SELECT p.id, p.full_name, p.public_ref, p.op_number, (SELECT value FROM patient_contact c WHERE c.patient_id=p.id AND c.kind='PHONE' LIMIT 1) phone
        FROM patient p WHERE p.id=$1 AND p.organization_id=$2`, [sp.patient, actor.organizationId]);
   if (!patient) notFound();
   // Adding one visit to an existing package (e.g. replacing a cancelled day).
@@ -72,7 +72,7 @@ export default async function StaffBookPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <p className="mb-2 text-sm"><Link href={isPackage ? "/admin/book?mode=package" : "/admin/book"}>← Choose a different patient</Link></p>
-      <PageHeader title={pkg ? "Add a package session" : isPackage ? "Book a package" : "New booking"} lead={<>For <Link href={`/admin/patients/${patient.id}`} className="font-semibold">{patient.full_name}</Link> · {patient.phone ? displayPhone(patient.phone) : "no phone"}</>} />
+      <PageHeader title={pkg ? "Add a package session" : isPackage ? "Book a package" : "New booking"} lead={<>For <Link href={`/admin/patients/${patient.id}`} className="font-semibold">{patient.full_name}</Link>{patient.op_number != null ? <> · <span className="font-mono">{formatOpNumber(patient.op_number)}</span></> : null} · {patient.phone ? displayPhone(patient.phone) : "no phone"}</>} />
       {pkg ? (
         <div className="mb-4"><Notice>Adding a session to <Link href={`/admin/packages/${pkg.id}`} className="font-semibold">{pkg.name}</Link> ({pkg.done + pkg.upcoming + pkg.no_show} of {pkg.sessions_total} used). It won&apos;t be charged separately.</Notice></div>
       ) : (
