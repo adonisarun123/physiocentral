@@ -3,6 +3,7 @@ import { DomainError } from "@/lib/errors";
 import { audit } from "@/modules/audit";
 import { assertPermission, type Actor } from "@/modules/auth/actor";
 import { publicRef } from "@/lib/security/tokens";
+import { parseOpNumber, patientNumber } from "@/lib/format";
 import { normalizeIndianPhone } from "./contact";
 
 export const SEX_OPTIONS = [
@@ -68,12 +69,12 @@ export async function createPatient(actor: Actor, input: PatientInput & { allowD
   const prof = checkProfile(input);
   return tx(async (db) => {
     if (!input.allowDuplicate) {
-      const dupe = await q1<{ id: string; full_name: string; public_ref: string }>(
-        `SELECT p.id, p.full_name, p.public_ref FROM patient p JOIN patient_contact c ON c.patient_id=p.id
+      const dupe = await q1<{ id: string; full_name: string; public_ref: string; op_number: number | null }>(
+        `SELECT p.id, p.full_name, p.public_ref, p.op_number FROM patient p JOIN patient_contact c ON c.patient_id=p.id
           WHERE p.organization_id=$1 AND NOT p.archived AND c.kind='PHONE' AND c.value=$2 ORDER BY p.created_at LIMIT 1`,
         [actor.organizationId, phone], db);
       if (dupe) {
-        throw new DomainError("DUPLICATE", `${dupe.full_name} (${dupe.public_ref}) already has this phone number. Open their record, or tick "create anyway" for a different person (e.g. a family member).`);
+        throw new DomainError("DUPLICATE", `${dupe.full_name} (${patientNumber(dupe)}) already has this phone number. Open their record, or tick "create anyway" for a different person (e.g. a family member).`);
       }
     }
     const p = (await q1<{ id: string }>(
@@ -81,6 +82,8 @@ export async function createPatient(actor: Actor, input: PatientInput & { allowD
          age_years, age_recorded_on, sex, address, diagnosis, treatment_protocol)
        VALUES ($1,$2,$3,$4,false,$5,CASE WHEN $5::int IS NULL THEN NULL ELSE current_date END,$6,$7,$8,$9) RETURNING id`,
       [actor.organizationId, publicRef("PT"), name, input.isNewPatient ?? null, prof.age, prof.sex, prof.address, prof.diagnosis, prof.treatmentProtocol], db))!;
+    // Registered at the front desk, so they are a real patient: give them their OP number now.
+    await q(`SELECT assign_op_number($1)`, [p.id], db);
     await q(`INSERT INTO patient_contact (patient_id, kind, value, preferred) VALUES ($1,'PHONE',$2,true)`, [p.id, phone], db);
     if (email) await q(`INSERT INTO patient_contact (patient_id, kind, value) VALUES ($1,'EMAIL',$2)`, [p.id, email], db);
     await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "patient.create", targetType: "patient", targetId: p.id, changes: { source: "staff" }, correlationId });
@@ -108,23 +111,23 @@ export async function updatePatient(actor: Actor, input: PatientInput & { patien
   });
 }
 
-export interface PatientHit { id: string; public_ref: string; full_name: string; phone: string | null; last_visit: Date | null; created_at: Date }
+export interface PatientHit { id: string; public_ref: string; op_number: number | null; full_name: string; phone: string | null; last_visit: Date | null; created_at: Date }
 
-/** Search by name, reference or phone digits. */
+/** Search by name, OP number ("OP-0027", "op 27" or just "27"), old reference or phone digits. */
 export async function searchPatients(orgId: string, term: string, limit = 25) {
   const t = term.trim();
   const digits = t.replace(/\D/g, "");
   return q<PatientHit>(
-    `SELECT p.id, p.public_ref, p.full_name,
+    `SELECT p.id, p.public_ref, p.op_number, p.full_name,
             (SELECT value FROM patient_contact c WHERE c.patient_id=p.id AND c.kind='PHONE' ORDER BY preferred DESC LIMIT 1) phone,
             (SELECT max(starts_at) FROM appointment a WHERE a.patient_id=p.id) last_visit, p.created_at
        FROM patient p
       WHERE p.organization_id=$1 AND NOT p.archived
-        AND ($2 = '' OR p.full_name ILIKE '%'||$2||'%' OR p.public_ref ILIKE '%'||$2||'%'
+        AND ($2 = '' OR p.full_name ILIKE '%'||$2||'%' OR p.public_ref ILIKE '%'||$2||'%' OR p.op_number = $5::int
              OR (length($3) >= 4 AND EXISTS (SELECT 1 FROM patient_contact c WHERE c.patient_id=p.id AND c.kind='PHONE' AND regexp_replace(c.value,'\\D','','g') LIKE '%'||$3||'%')))
-      ORDER BY GREATEST(p.created_at, COALESCE((SELECT max(updated_at) FROM appointment a WHERE a.patient_id=p.id), p.created_at)) DESC
+      ORDER BY (p.op_number IS NOT DISTINCT FROM $5::int AND $5::int IS NOT NULL) DESC, GREATEST(p.created_at, COALESCE((SELECT max(updated_at) FROM appointment a WHERE a.patient_id=p.id), p.created_at)) DESC
       LIMIT $4`,
-    [orgId, t, digits, limit],
+    [orgId, t, digits, limit, parseOpNumber(t)],
   );
 }
 
@@ -134,4 +137,66 @@ export const CURRENT_AGE_SQL = `CASE WHEN p.age_years IS NULL THEN NULL
 
 export function sexLabel(v: string | null | undefined) {
   return SEX_OPTIONS.find((o) => o.value === v)?.label ?? null;
+}
+
+export interface ExistingMatch { request_patient_id: string; id: string; full_name: string; op_number: number; public_ref: string }
+
+/**
+ * An online request always starts a fresh patient record (the channel is
+ * unverified). This finds patients already on the books with the same mobile,
+ * so staff can attach the request to them instead of creating a second record
+ * and a second OP number. A shared phone is common in families, so it is only
+ * ever a suggestion for staff to confirm.
+ */
+export async function existingPatientMatches(orgId: string, requestPatientIds: string[]) {
+  if (!requestPatientIds.length) return [];
+  return q<ExistingMatch>(
+    `SELECT DISTINCT rc.patient_id request_patient_id, p.id, p.full_name, p.op_number, p.public_ref
+       FROM patient_contact rc
+       JOIN patient_contact c ON c.kind='PHONE' AND c.value=rc.value AND c.patient_id <> rc.patient_id
+       JOIN patient p ON p.id=c.patient_id AND p.organization_id=$1 AND NOT p.archived AND p.op_number IS NOT NULL
+      WHERE rc.kind='PHONE' AND rc.patient_id = ANY($2::uuid[])
+      ORDER BY p.op_number`,
+    [orgId, requestPatientIds],
+  );
+}
+
+/**
+ * Attach a pending online request to a patient who is already registered.
+ * Only while the request is still unconfirmed, and only when the record the
+ * request created has nothing else on it; that record is then archived.
+ */
+export async function attachRequestToPatient(actor: Actor, input: { appointmentId: string; expectedVersion: number; patientId: string }, correlationId: string) {
+  assertPermission(actor, "APPOINTMENT_ACCEPT");
+  assertPermission(actor, "PATIENT_CONTACT_VIEW");
+  return tx(async (db) => {
+    const appt = await q1<{ id: string; status: string; version: number; patient_id: string }>(
+      `SELECT id, status, version, patient_id FROM appointment WHERE id=$1 AND organization_id=$2 FOR UPDATE`, [input.appointmentId, actor.organizationId], db);
+    if (!appt) throw new DomainError("NOT_FOUND", "Appointment not found.");
+    if (appt.version !== input.expectedVersion) throw new DomainError("STALE_VERSION", "This appointment was changed by someone else. Reload to see the latest version.");
+    if (appt.status !== "REQUESTED") throw new DomainError("INVALID_TRANSITION", "Only a request that has not been confirmed yet can be moved to another patient record.");
+    if (appt.patient_id === input.patientId) throw new DomainError("VALIDATION", "This request is already on that patient's record.");
+    // Lock both records in id order so two staff doing this at once cannot deadlock.
+    const locked = await q<{ id: string; full_name: string; archived: boolean; op_number: number | null; public_ref: string }>(
+      `SELECT id, full_name, archived, op_number, public_ref FROM patient WHERE id = ANY($1::uuid[]) AND organization_id=$2 ORDER BY id FOR UPDATE`,
+      [[appt.patient_id, input.patientId], actor.organizationId], db);
+    const fresh = locked.find((p) => p.id === appt.patient_id);
+    const target = locked.find((p) => p.id === input.patientId);
+    if (!fresh || !target || target.archived) throw new DomainError("NOT_FOUND", "Patient not found.");
+    const used = (await q1<{ n: string }>(
+      `SELECT ((SELECT count(*) FROM appointment WHERE patient_id=$1 AND id <> $2) + (SELECT count(*) FROM payment WHERE patient_id=$1)
+             + (SELECT count(*) FROM invoice WHERE patient_id=$1) + (SELECT count(*) FROM estimate WHERE patient_id=$1)
+             + (SELECT count(*) FROM billable_charge WHERE patient_id=$1) + (SELECT count(*) FROM patient_package WHERE patient_id=$1))::text n`,
+      [fresh.id, appt.id], db))!;
+    if (fresh.op_number != null || used.n !== "0") {
+      throw new DomainError("INVALID_TRANSITION", "The record this request came in on already has visits or bills of its own, so it cannot be merged from here.");
+    }
+    await q(`UPDATE appointment SET patient_id=$2, version=version+1, updated_at=now() WHERE id=$1`, [appt.id, target.id], db);
+    // The privacy acknowledgement and contact consents given with this request belong to the person, so they move too.
+    await q(`UPDATE consent_record SET patient_id=$2 WHERE patient_id=$1`, [fresh.id, target.id], db);
+    await q(`UPDATE patient SET archived=true, updated_at=now() WHERE id=$1`, [fresh.id], db);
+    await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "appointment.use_existing_patient", targetType: "appointment", targetId: appt.id,
+      changes: { fromPatient: fresh.id, toPatient: target.id }, correlationId });
+    return { patientName: target.full_name, patientNumber: patientNumber(target) };
+  });
 }

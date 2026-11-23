@@ -9,10 +9,11 @@ import type { ActionResult } from "@/components/action-form";
 import { acceptAppointment, cancelAppointment, rejectAppointment, transitionAppointment, type TransitionName } from "@/modules/scheduling/appointments";
 import { addEstimateLine, createEstimate, decideEstimate, markEstimateLinePerformed, removeEstimateLine, reviseEstimate, sendEstimateVersion } from "@/modules/billing/estimates";
 import { createDirectInvoice, createDraftInvoice, discardDraftInvoice, issueInvoice } from "@/modules/billing/invoices";
-import { createPatient, updatePatient } from "@/modules/patients/admin";
+import { createPatient, updatePatient, attachRequestToPatient } from "@/modules/patients/admin";
 import { createPackageBooking, createStaffBooking, setPackageStatus } from "@/modules/scheduling/staff-booking";
 import { createStaffLogin, resetStaffPassword, setStaffActive, updateStaff } from "@/modules/staff/admin";
 import { allocatePayment, recordManualPayment, verifyPayment } from "@/modules/payments/manual";
+import { refundPayment, reversePayment } from "@/modules/payments/refunds";
 import { addPriceVersion, createService, setServiceStatus, updateServiceDetails } from "@/modules/catalog/admin";
 import { addTimeOff, createTherapist, removeTimeOff, setTherapistActive, setTherapistHours, setTherapistServices, shiftsFromForm, updateTherapistProfile } from "@/modules/clinic/team";
 
@@ -148,6 +149,27 @@ export async function allocateAction(_: ActionResult, fd: FormData) {
     [`/admin/invoices/${s(fd, "invoiceId")}`, "/admin/payments"]);
 }
 
+export async function refundPaymentAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const r = await refundPayment(a, {
+      paymentId: s(fd, "paymentId"), amountRupees: s(fd, "amountRupees"), method: s(fd, "method"), refundedOn: s(fd, "refundedOn"),
+      paidFrom: s(fd, "paidFrom"), reference: s(fd, "reference") || undefined, reason: s(fd, "reason"),
+      appointmentId: s(fd, "appointmentId") || undefined, creditBills: fd.get("creditBills") === "on",
+    }, cid);
+    const bills = r.creditNotes.length ? ` Bill reduced by credit note ${r.creditNotes.join(", ")}.`
+      : r.releasedFrom.length ? ` ${r.releasedFrom.join(", ")} is unpaid again for that amount.` : "";
+    return `Refund recorded. Voucher ${r.number}.${bills}`;
+  }, [`/admin/payments/${s(fd, "paymentId")}`, "/admin/payments", "/admin/invoices", `/admin/patients/${s(fd, "patientId")}`,
+      ...(s(fd, "appointmentId") ? [`/admin/appointments/${s(fd, "appointmentId")}`] : [])]);
+}
+
+export async function reversePaymentAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const r = await reversePayment(a, { paymentId: s(fd, "paymentId"), reason: s(fd, "reason") }, cid);
+    return r.releasedFrom.length ? `Entry reversed. ${r.releasedFrom.join(", ")} is unpaid again.` : "Entry reversed.";
+  }, [`/admin/payments/${s(fd, "paymentId")}`, "/admin/payments", "/admin/invoices", `/admin/patients/${s(fd, "patientId")}`]);
+}
+
 export async function addPriceAction(_: ActionResult, fd: FormData) {
   return run(async (a, cid) => { await addPriceVersion(a, { serviceId: s(fd, "serviceId"), amountRupees: s(fd, "amountRupees"), effectiveFrom: s(fd, "effectiveFrom") || null }, cid); return "Price version added."; }, ["/admin/catalog"]);
 }
@@ -259,6 +281,13 @@ export async function createPatientAction(_: ActionResult, fd: FormData): Promis
     redirect(next ? `${next}${next.includes("?") ? "&" : "?"}patient=${id}` : `/admin/patients/${id}`);
   }
   return res;
+}
+
+export async function attachRequestToPatientAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const r = await attachRequestToPatient(a, { appointmentId: s(fd, "id"), expectedVersion: n(fd, "version"), patientId: s(fd, "patientId") }, cid);
+    return `Moved to ${r.patientName} (${r.patientNumber}). The extra record was archived.`;
+  }, ["/admin/requests", `/admin/appointments/${s(fd, "id")}`, "/admin/patients", `/admin/patients/${s(fd, "patientId")}`]);
 }
 
 export async function updatePatientAction(_: ActionResult, fd: FormData) {

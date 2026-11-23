@@ -23,6 +23,11 @@ const STATUS_STYLE: Record<string, string> = {
   UNPAID: "text-[var(--color-danger)] bg-[var(--color-danger-soft)]",
   PARTIALLY_PAID: "text-[var(--color-warn)] bg-[var(--color-warn-soft)]",
   PAID: "text-[var(--color-ok)] bg-[var(--color-ok-soft)]",
+  CLOSED: "text-[var(--color-ink-muted)] bg-[var(--color-surface-alt)]",
+  VOIDED: "text-[var(--color-ink-muted)] bg-[var(--color-surface-alt)]",
+  REVERSED: "text-[var(--color-danger)] bg-[var(--color-danger-soft)]",
+  REFUNDED: "text-[var(--color-danger)] bg-[var(--color-danger-soft)]",
+  PART_REFUNDED: "text-[var(--color-warn)] bg-[var(--color-warn-soft)]",
 };
 
 const STATUS_TEXT: Record<string, string> = {
@@ -31,6 +36,9 @@ const STATUS_TEXT: Record<string, string> = {
   CHECKED_IN: "Checked in",
   NO_SHOW: "No-show",
   PARTIALLY_PAID: "Partially paid",
+  PART_REFUNDED: "Part refunded",
+  REVERSED: "Reversed (entry error)",
+  CLOSED: "Nothing due",
 };
 
 /** Status is conveyed as text, not colour alone (§4.2). */

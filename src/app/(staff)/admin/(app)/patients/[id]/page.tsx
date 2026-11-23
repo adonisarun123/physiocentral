@@ -8,7 +8,8 @@ import { PageHeader, StatusBadge } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { PaymentForm } from "@/components/admin/payment-form";
 import { computeBalance, formatINR } from "@/modules/billing/money";
-import { displayPhone, formatDate, formatDateTime } from "@/lib/format";
+import { displayPhone, formatDate, formatDateTime, patientNumber } from "@/lib/format";
+import { paymentDisplayStatus } from "@/modules/payments/refunds";
 import { updatePatientAction } from "../../../actions";
 import { PatientProfileFields } from "@/components/admin/patient-profile-fields";
 import { PackageProgress } from "@/components/admin/package-progress";
@@ -22,9 +23,9 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const actor = await requireStaff("PATIENT_CONTACT_VIEW");
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
-  const p = await q1<{ id: string; public_ref: string; full_name: string; created_at: Date; age: number | null; sex: string | null;
+  const p = await q1<{ id: string; public_ref: string; op_number: number | null; full_name: string; created_at: Date; age: number | null; sex: string | null;
     address: string | null; diagnosis: string | null; treatment_protocol: string | null }>(
-    `SELECT p.id, p.public_ref, p.full_name, p.created_at, ${CURRENT_AGE_SQL} age, p.sex, p.address, p.diagnosis, p.treatment_protocol
+    `SELECT p.id, p.public_ref, p.op_number, p.full_name, p.created_at, ${CURRENT_AGE_SQL} age, p.sex, p.address, p.diagnosis, p.treatment_protocol
        FROM patient p WHERE p.id=$1 AND p.organization_id=$2`, [id, actor.organizationId]);
   if (!p) notFound();
   const [contacts, visits, invoices, payments, packages] = await Promise.all([
@@ -33,17 +34,17 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
       `SELECT a.id, a.public_ref, a.starts_at, a.status, s.name service, t.display_name therapist, a.source,
               (SELECT name FROM patient_package k WHERE k.id=a.package_id) package_name FROM appointment a
          JOIN service s ON s.id=a.service_id LEFT JOIN therapist t ON t.id=a.therapist_id WHERE a.patient_id=$1 ORDER BY a.starts_at DESC LIMIT 50`, [id]),
-    q<{ id: string; number: string | null; status: string; total_paise: string; allocated: string | null; at: Date }>(
-      `SELECT i.id, i.number, i.status, i.total_paise, b.net_allocated_paise::text allocated, COALESCE(i.issued_at, i.created_at) at
+    q<{ id: string; number: string | null; status: string; total_paise: string; allocated: string | null; liability: string | null; credited: string | null; at: Date }>(
+      `SELECT i.id, i.number, i.status, i.total_paise, b.net_allocated_paise::text allocated, b.net_liability_paise::text liability, b.credited_paise::text credited, COALESCE(i.issued_at, i.created_at) at
          FROM invoice i LEFT JOIN invoice_balance b ON b.invoice_id=i.id WHERE i.patient_id=$1 AND i.status <> 'VOIDED' ORDER BY at DESC`, [id]),
-    q<{ id: string; amount_paise: string; method: string; status: string; received_on: string; unallocated: string; receipt_id: string | null; receipt_number: string | null }>(
-      `SELECT pm.id, pm.amount_paise, pm.method, pm.status, to_char(pm.received_on,'YYYY-MM-DD') received_on, f.unallocated_paise::text unallocated, r.id receipt_id, r.number receipt_number
+    q<{ id: string; amount_paise: string; method: string; status: string; received_on: string; unallocated: string; refunded: string; receipt_id: string | null; receipt_number: string | null }>(
+      `SELECT pm.id, pm.amount_paise, pm.method, pm.status, to_char(pm.received_on,'YYYY-MM-DD') received_on, f.unallocated_paise::text unallocated, f.refunded_paise::text refunded, r.id receipt_id, r.number receipt_number
          FROM payment pm JOIN payment_funds f ON f.payment_id=pm.id LEFT JOIN receipt r ON r.payment_id=pm.id WHERE pm.patient_id=$1 ORDER BY pm.created_at DESC`, [id]),
     listPackages(actor.organizationId, { patientId: id }),
   ]);
   const phone = contacts.find((c) => c.kind === "PHONE")?.value ?? "";
   const email = contacts.find((c) => c.kind === "EMAIL")?.value ?? "";
-  const open = invoices.filter((i) => i.status === "ISSUED").map((i) => ({ ...i, bal: computeBalance(BigInt(i.total_paise), BigInt(i.allocated ?? "0")) }))
+  const open = invoices.filter((i) => i.status === "ISSUED").map((i) => ({ ...i, bal: computeBalance(BigInt(i.liability ?? i.total_paise), BigInt(i.allocated ?? "0")) }))
     .filter((i) => i.bal.amountDuePaise > 0n);
   const due = open.reduce((s, i) => s + i.bal.amountDuePaise, 0n);
   const credit = payments.filter((x) => x.status === "VERIFIED").reduce((s, x) => s + BigInt(x.unallocated), 0n);
@@ -51,7 +52,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   return (
     <>
       <p className="mb-2 text-sm"><Link href="/admin/patients">← Patients</Link></p>
-      <PageHeader title={p.full_name} lead={<><span className="font-mono">{p.public_ref}</span>{p.age != null || p.sex ? ` · ${[p.age != null ? `${p.age} yrs` : null, sexLabel(p.sex)].filter(Boolean).join(", ")}` : ""} · {phone ? displayPhone(phone) : "no phone"} · since {formatDate(p.created_at)}</>}>
+      <PageHeader title={p.full_name} lead={<><span className="font-mono font-semibold">{patientNumber(p)}</span>{p.age != null || p.sex ? ` · ${[p.age != null ? `${p.age} yrs` : null, sexLabel(p.sex)].filter(Boolean).join(", ")}` : ""} · {phone ? displayPhone(phone) : "no phone"} · since {formatDate(p.created_at)}</>}>
         {can(actor, "APPOINTMENT_ACCEPT") ? <Link href={`/admin/book?patient=${p.id}`} className="btn btn-primary">Book appointment</Link> : null}
         {can(actor, "APPOINTMENT_ACCEPT") ? <Link href={`/admin/book?patient=${p.id}&mode=package`} className="btn btn-secondary">Book package</Link> : null}
         {can(actor, "INVOICE_DRAFT") ? <Link href={`/admin/invoices/new?patient=${p.id}`} className="btn btn-secondary">New invoice</Link> : null}
@@ -93,11 +94,14 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
           <h2 className="text-lg font-bold">Invoices &amp; payments</h2>
           <ul className="mt-2 divide-y divide-[var(--color-line)]">
             {invoices.map((i) => {
-              const bal = i.status === "ISSUED" ? computeBalance(BigInt(i.total_paise), BigInt(i.allocated ?? "0")) : null;
-              return <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><span><Link href={`/admin/invoices/${i.id}`} className="font-semibold">{i.number ?? "Draft invoice"}</Link> · {formatDate(i.at)} · {formatINR(i.total_paise)}</span>{bal ? <StatusBadge status={bal.collectionStatus} /> : <StatusBadge status={i.status} />}</li>;
+              const bal = i.status === "ISSUED" ? computeBalance(BigInt(i.liability ?? i.total_paise), BigInt(i.allocated ?? "0")) : null;
+              return <li key={i.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><span><Link href={`/admin/invoices/${i.id}`} className="font-semibold">{i.number ?? "Draft invoice"}</Link> · {formatDate(i.at)} · {formatINR(i.total_paise)}{i.credited && i.credited !== "0" ? ` · less credit note ${formatINR(i.credited)}` : ""}</span>{bal ? <StatusBadge status={bal.collectionStatus} /> : <StatusBadge status={i.status} />}</li>;
             })}
             {payments.map((x) => (
-              <li key={x.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><span>Payment {formatINR(x.amount_paise)} · {x.method.replace("_MANUAL", "").replace("_", " ").toLowerCase()} · {x.received_on}{x.receipt_id ? <> · <Link href={`/admin/receipts/${x.receipt_id}`}>{x.receipt_number}</Link></> : null}</span><StatusBadge status={x.status} /></li>
+              <li key={x.id} className="flex flex-wrap items-center justify-between gap-2 py-2"><span><Link href={`/admin/payments/${x.id}`} className="font-semibold">Payment {formatINR(x.amount_paise)}</Link> · {x.method.replace("_MANUAL", "").replace("_", " ").toLowerCase()} · {x.received_on}{x.receipt_id ? <> · <Link href={`/admin/receipts/${x.receipt_id}`}>{x.receipt_number}</Link></> : null}
+                {x.refunded !== "0" ? <span className="block text-sm text-[var(--color-ink-muted)]">Refunded {formatINR(x.refunded)}</span> : null}</span>
+                <span className="flex items-center gap-2"><StatusBadge status={paymentDisplayStatus(x.status, x.amount_paise, x.refunded)} />
+                  {x.status === "VERIFIED" && BigInt(x.refunded) < BigInt(x.amount_paise) && can(actor, "PAYMENT_REFUND") ? <Link href={`/admin/payments/${x.id}`} className="btn btn-secondary btn-sm">Refund</Link> : null}</span></li>
             ))}
             {!invoices.length && !payments.length ? <li className="py-2 text-sm text-[var(--color-ink-muted)]">Nothing billed yet.</li> : null}
           </ul>

@@ -5,10 +5,11 @@ import { requireStaff } from "@/modules/auth/session";
 import { can } from "@/modules/auth/actor";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { acceptAction, rejectAction } from "../../actions";
-import { ageLabel, formatDateTime } from "@/lib/format";
+import { acceptAction, rejectAction, attachRequestToPatientAction } from "../../actions";
+import { ageLabel, formatDateTime, formatOpNumber } from "@/lib/format";
 import { formatINR } from "@/modules/billing/money";
 import { maskPhone } from "@/modules/patients/contact";
+import { existingPatientMatches } from "@/modules/patients/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Request inbox" };
@@ -18,11 +19,11 @@ export default async function RequestsPage() {
   const showContact = can(actor, "PATIENT_CONTACT_VIEW");
   const rows = await q<{
     id: string; public_ref: string; version: number; created_at: Date; starts_at: Date; duration_minutes: number; source: string;
-    contact_verified: boolean; accessibility_needs: string | null; quoted_price_paise: string | null; patient: string; phone: string | null;
+    contact_verified: boolean; accessibility_needs: string | null; quoted_price_paise: string | null; patient: string; patient_id: string; phone: string | null;
     service: string; branch: string; timezone: string; pref: string | null;
   }>(
     `SELECT a.id, a.public_ref, a.version, a.created_at, a.starts_at, a.duration_minutes, a.source, a.contact_verified, a.accessibility_needs,
-            a.quoted_price_paise, p.full_name patient,
+            a.quoted_price_paise, p.full_name patient, p.id patient_id,
             (SELECT value FROM patient_contact c WHERE c.patient_id=p.id AND c.kind='PHONE' ORDER BY preferred DESC LIMIT 1) phone,
             s.name service, b.name branch, b.timezone, t.display_name pref
        FROM appointment a JOIN patient p ON p.id=a.patient_id JOIN service s ON s.id=a.service_id JOIN branch b ON b.id=a.branch_id
@@ -32,6 +33,7 @@ export default async function RequestsPage() {
     [actor.organizationId],
   );
   const canAccept = can(actor, "APPOINTMENT_ACCEPT");
+  const matches = canAccept && showContact ? await existingPatientMatches(actor.organizationId, rows.map((r) => r.patient_id)) : [];
 
   return (
     <>
@@ -53,6 +55,21 @@ export default async function RequestsPage() {
                 <div><dt className="inline font-semibold">Quoted fee: </dt><dd className="inline">{r.quoted_price_paise ? formatINR(r.quoted_price_paise) : "Estimate after assessment"}</dd></div>
                 {r.accessibility_needs ? <div className="sm:col-span-2"><dt className="inline font-semibold">Access needs: </dt><dd className="inline">{r.accessibility_needs}</dd></div> : null}
               </dl>
+              {matches.some((m) => m.request_patient_id === r.patient_id) ? (
+                <div className="mt-3 rounded-lg border-l-4 border-[var(--color-warn)] bg-[var(--color-warn-soft)] p-3">
+                  <p className="font-semibold">This mobile number is already on a patient record</p>
+                  <p className="text-sm">If it is the same person, use their record so they keep one OP number. If it is a family member, just accept below.</p>
+                  <ul className="mt-2 space-y-2">{matches.filter((m) => m.request_patient_id === r.patient_id).map((m) => (
+                    <li key={m.id} className="flex flex-wrap items-center gap-3">
+                      <span><Link href={`/admin/patients/${m.id}`} className="font-semibold">{m.full_name}</Link> <span className="font-mono text-sm">{formatOpNumber(m.op_number)}</span></span>
+                      <ActionForm action={attachRequestToPatientAction} confirm={`Put this request on ${m.full_name}'s record?`}>
+                        <input type="hidden" name="id" value={r.id} /><input type="hidden" name="version" value={r.version} /><input type="hidden" name="patientId" value={m.id} />
+                        <SubmitButton small variant="secondary">Use this record</SubmitButton>
+                      </ActionForm>
+                    </li>
+                  ))}</ul>
+                </div>
+              ) : null}
               {canAccept ? (
                 <div className="mt-4 flex flex-wrap items-start gap-4">
                   <ActionForm action={acceptAction}>

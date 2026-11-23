@@ -84,7 +84,7 @@ export function sumLines(lines: LineResult[]) {
   );
 }
 
-/** Balance per §10.2 with credit notes / refunds = 0 in this release. */
+/** Balance per §10.2. `netLiability` is the invoice total less its credit notes (invoice_balance.net_liability_paise). */
 export function computeBalance(netLiability: bigint, netAllocated: bigint) {
   const due = netLiability - netAllocated;
   return {

@@ -80,3 +80,21 @@ export function hoursSummary(hours: { weekday: number; opens: string; closes: st
     .map((g) => `${g.days.replace(" – ", "–").replace(/^(Sun|Mon|Tue|Wed|Thu|Fri|Sat)[a-z]*day$/, "$1")} ${g.hours}`)
     .join(" · ");
 }
+
+/** Out-patient number as staff see it: 27 → "OP-0027". Null until the patient has one. */
+export function formatOpNumber(n: number | null | undefined): string | null {
+  return n == null ? null : `OP-${String(n).padStart(4, "0")}`;
+}
+
+/** What to show next to a patient's name: the OP number, or the internal ref for records that do not have one yet. */
+export function patientNumber(p: { op_number: number | null; public_ref: string }): string {
+  return formatOpNumber(p.op_number) ?? p.public_ref;
+}
+
+/** Reads "OP-0027", "op 27" or "27" as OP number 27. Anything else is not an OP number. */
+export function parseOpNumber(term: string): number | null {
+  const m = /^(?:op[\s./-]*)?0*(\d{1,7})$/i.exec(term.trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n > 0 ? n : null;
+}

@@ -1,4 +1,5 @@
 import { q, q1 } from "@/lib/db";
+import { parseOpNumber } from "@/lib/format";
 
 export interface PackageRow {
   id: string;
@@ -10,6 +11,7 @@ export interface PackageRow {
   created_at: Date;
   patient_id: string;
   patient: string;
+  /** OP number as shown to staff ("OP-0027"), or the internal ref when the patient has none yet. */
   patient_ref: string;
   phone: string | null;
   /** Visits completed. */
@@ -25,7 +27,7 @@ export interface PackageRow {
 
 const BASE = `
   SELECT k.id, k.public_ref, k.name, k.status, k.sessions_total, k.price_paise::text, k.created_at, k.patient_id,
-         p.full_name patient, p.public_ref patient_ref,
+         p.full_name patient, COALESCE('OP-'||lpad(p.op_number::text, 4, '0'), p.public_ref) patient_ref,
          (SELECT value FROM patient_contact c WHERE c.patient_id=p.id AND c.kind='PHONE' ORDER BY preferred DESC LIMIT 1) phone,
          count(a.id) FILTER (WHERE a.status='COMPLETED')::int done,
          count(a.id) FILTER (WHERE a.status IN ('CONFIRMED','CHECKED_IN','IN_PROGRESS','REQUESTED','AWAITING_PATIENT_CONFIRMATION','AWAITING_DEPOSIT'))::int upcoming,
@@ -48,9 +50,9 @@ export function listPackages(orgId: string, opts: { patientId?: string; view?: "
   const t = (opts.term ?? "").trim();
   return q<PackageRow>(
     `${BASE} WHERE k.organization_id=$1 AND ($2::uuid IS NULL OR k.patient_id=$2)
-        AND ($3 = '' OR p.full_name ILIKE '%'||$3||'%' OR p.public_ref ILIKE '%'||$3||'%' OR k.public_ref ILIKE '%'||$3||'%')
+        AND ($3 = '' OR p.full_name ILIKE '%'||$3||'%' OR p.public_ref ILIKE '%'||$3||'%' OR k.public_ref ILIKE '%'||$3||'%' OR p.op_number = $4::int)
      ${GROUP}${having} ORDER BY next_at NULLS LAST, k.created_at DESC LIMIT 200`,
-    [orgId, opts.patientId ?? null, t],
+    [orgId, opts.patientId ?? null, t, parseOpNumber(t)],
   );
 }
 

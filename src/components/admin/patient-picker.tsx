@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { searchPatients } from "@/modules/patients/admin";
-import { displayPhone, formatDate } from "@/lib/format";
+import { displayPhone, formatDate, patientNumber } from "@/lib/format";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { createPatientAction } from "@/app/(staff)/admin/actions";
 import { PatientProfileFields } from "./patient-profile-fields";
@@ -18,14 +18,14 @@ export async function PatientPicker({ orgId, target, term, extra = "" }: { orgId
         <h2 className="text-lg font-bold">Find the patient</h2>
         <form className="mt-3 flex flex-wrap items-end gap-2" role="search" action={target}>
           {extra.split("&").filter(Boolean).map((kv) => { const [k, v] = kv.split("="); return <input key={k} type="hidden" name={k} value={decodeURIComponent(v ?? "")} />; })}
-          <div className="min-w-56 flex-1"><label htmlFor="pq" className="field-label">Name, phone or patient ref</label><input id="pq" name="q" defaultValue={term} className="input" autoFocus /></div>
+          <div className="min-w-56 flex-1"><label htmlFor="pq" className="field-label">Name, phone or OP number</label><input id="pq" name="q" defaultValue={term} className="input" autoFocus /></div>
           <button className="btn btn-secondary">Search</button>
         </form>
         <p className="mt-4 text-sm font-semibold text-[var(--color-ink-muted)]">{term ? `${hits.length} match(es)` : "Recent patients"}</p>
         <ul className="mt-1 divide-y divide-[var(--color-line)]">
           {hits.map((h) => (
             <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <span><span className="font-semibold">{h.full_name}</span> <span className="font-mono text-xs">{h.public_ref}</span>
+              <span><span className="font-semibold">{h.full_name}</span> <span className="font-mono text-xs">{patientNumber(h)}</span>
                 <span className="block text-sm text-[var(--color-ink-muted)]">{h.phone ? displayPhone(h.phone) : "no phone"} · {h.last_visit ? `last visit ${formatDate(h.last_visit)}` : `added ${formatDate(h.created_at)}`}</span></span>
               <Link href={join(h.id)} className="btn btn-secondary btn-sm">Select</Link>
             </li>

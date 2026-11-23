@@ -16,7 +16,9 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
   if (!actor.permissions.has("PAYMENT_RECORD") && !actor.permissions.has("FINANCE_VIEW")) notFound();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const r = await q1<{ snapshot: Snap }>(`SELECT snapshot FROM receipt WHERE id=$1 AND organization_id=$2`, [id, actor.organizationId]);
+  const r = await q1<{ snapshot: Snap; status: string; refunded: string }>(
+    `SELECT r.snapshot, p.status, f.refunded_paise::text refunded FROM receipt r JOIN payment p ON p.id=r.payment_id JOIN payment_funds f ON f.payment_id=p.id
+      WHERE r.id=$1 AND r.organization_id=$2`, [id, actor.organizationId]);
   if (!r) notFound();
   const s = r.snapshot;
   return (
@@ -27,6 +29,8 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
         <h1 className="text-2xl font-bold">Payment receipt</h1>
         <p>No. <strong>{s.number}</strong> · {formatDate(s.issuedAt)}</p>
       </header>
+      {r.status === "REVERSED" ? <p className="mt-3 border-2 border-[var(--color-ink)] p-2 font-bold">CANCELLED — this payment entry was reversed. This receipt is no longer valid.</p> : null}
+      {r.status !== "REVERSED" && r.refunded !== "0" ? <p className="mt-3 border-2 border-[var(--color-ink)] p-2 font-bold">{formatINR(r.refunded)} of this payment has since been refunded.</p> : null}
       <dl className="mt-4 space-y-1">
         <div><dt className="inline font-semibold">Received from: </dt><dd className="inline">{s.receivedFrom} (ref {s.patientRef})</dd></div>
         <div><dt className="inline font-semibold">Amount: </dt><dd className="inline text-lg font-bold">{formatINR(s.amountPaise)}</dd></div>

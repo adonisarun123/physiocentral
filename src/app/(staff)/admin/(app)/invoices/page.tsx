@@ -15,8 +15,8 @@ export default async function InvoicesPage() {
     const { redirect } = await import("next/navigation");
     redirect("/admin/forbidden");
   }
-  const rows = await q<{ id: string; number: string | null; status: string; total_paise: string; created_at: Date; issued_at: Date | null; patient: string; allocated: string | null }>(
-    `SELECT i.id, i.number, i.status, i.total_paise, i.created_at, i.issued_at, p.full_name patient, b.net_allocated_paise::text allocated
+  const rows = await q<{ id: string; number: string | null; status: string; total_paise: string; created_at: Date; issued_at: Date | null; patient: string; allocated: string | null; liability: string | null }>(
+    `SELECT i.id, i.number, i.status, i.total_paise, i.created_at, i.issued_at, p.full_name patient, b.net_allocated_paise::text allocated, b.net_liability_paise::text liability
        FROM invoice i JOIN patient p ON p.id=i.patient_id LEFT JOIN invoice_balance b ON b.invoice_id=i.id
       WHERE i.organization_id=$1 ORDER BY COALESCE(i.issued_at, i.created_at) DESC LIMIT 200`,
     [actor.organizationId],
@@ -32,7 +32,7 @@ export default async function InvoicesPage() {
             <thead><tr><th>Number</th><th>Patient</th><th>Date</th><th>Document</th><th>Collection</th><th className="num">Total</th><th className="num">Due</th></tr></thead>
             <tbody>
               {rows.map((r) => {
-                const bal = r.status === "ISSUED" ? computeBalance(BigInt(r.total_paise), BigInt(r.allocated ?? "0")) : null;
+                const bal = r.status === "ISSUED" ? computeBalance(BigInt(r.liability ?? r.total_paise), BigInt(r.allocated ?? "0")) : null;
                 return (
                   <tr key={r.id}>
                     <td><Link href={`/admin/invoices/${r.id}`}>{r.number ?? "Draft"}</Link></td>
