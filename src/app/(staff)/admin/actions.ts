@@ -268,7 +268,8 @@ export async function removeTimeOffAction(_: ActionResult, fd: FormData) {
 // ───────────── Patients, staff booking, direct invoices ─────────────
 /** Only allow redirects back into the admin area. */
 const safeNext = (v: string) => (/^\/admin\/[a-z/-]*(\?[\w=&%-]*)?$/i.test(v) ? v : "");
-const profile = (fd: FormData) => ({ age: s(fd, "age"), sex: s(fd, "sex"), address: s(fd, "address"), diagnosis: s(fd, "diagnosis"), treatmentProtocol: s(fd, "treatmentProtocol") });
+// Contact/registration only. Clinical detail is recorded in the chart (episodes, notes), not on the registration form.
+const profile = (fd: FormData) => ({ age: s(fd, "age"), sex: s(fd, "sex"), address: s(fd, "address") });
 
 export async function createPatientAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
   let id: string | null = null;

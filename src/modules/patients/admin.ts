@@ -1,7 +1,7 @@
 import { tx, q, q1 } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { audit } from "@/modules/audit";
-import { assertPermission, type Actor } from "@/modules/auth/actor";
+import { assertPermission, type Actor, type StaffActor } from "@/modules/auth/actor";
 import { publicRef } from "@/lib/security/tokens";
 import { parseOpNumber, patientNumber } from "@/lib/format";
 import { normalizeIndianPhone } from "./contact";
@@ -67,6 +67,7 @@ export async function createPatient(actor: Actor, input: PatientInput & { allowD
   assertPermission(actor, "PATIENT_CONTACT_VIEW");
   const { name, phone, email } = check(input);
   const prof = checkProfile(input);
+  assertClinicalFieldsAllowed(actor, prof);
   return tx(async (db) => {
     if (!input.allowDuplicate) {
       const dupe = await q1<{ id: string; full_name: string; public_ref: string; op_number: number | null }>(
@@ -91,23 +92,39 @@ export async function createPatient(actor: Actor, input: PatientInput & { allowD
   });
 }
 
+/**
+ * Diagnosis and treatment protocol are clinical (feature #10): contact
+ * permissions alone cannot write them. New clinical detail belongs in an
+ * episode of care; these two columns are kept as the pre-episode history.
+ */
+function assertClinicalFieldsAllowed(actor: StaffActor, prof: { diagnosis: string | null; treatmentProtocol: string | null }) {
+  if ((prof.diagnosis || prof.treatmentProtocol) && !actor.permissions.has("CLINICAL_NOTES_WRITE")) {
+    throw new DomainError("FORBIDDEN", "Diagnosis and treatment protocol can only be recorded by a treating physiotherapist.");
+  }
+}
+
 export async function updatePatient(actor: Actor, input: PatientInput & { patientId: string }, correlationId: string) {
   assertPermission(actor, "PATIENT_CONTACT_VIEW");
   const { name, phone, email } = check(input);
   const prof = checkProfile(input);
+  // Leaving the clinical fields out keeps whatever is stored; sending them is a clinical edit.
+  const clinicalEdit = input.diagnosis !== undefined || input.treatmentProtocol !== undefined;
+  if (clinicalEdit) assertPermission(actor, "CLINICAL_NOTES_WRITE");
   return tx(async (db) => {
     const p = await q1<{ id: string }>(`SELECT id FROM patient WHERE id=$1 AND organization_id=$2 FOR UPDATE`, [input.patientId, actor.organizationId], db);
     if (!p) throw new DomainError("NOT_FOUND", "Patient not found.");
     // The age entered is the age today, so the recorded-on date moves with it.
     await q(
       `UPDATE patient SET full_name=$2, age_years=$3, age_recorded_on=CASE WHEN $3::int IS NULL THEN NULL ELSE current_date END,
-              sex=$4, address=$5, diagnosis=$6, treatment_protocol=$7, updated_at=now() WHERE id=$1`,
-      [p.id, name, prof.age, prof.sex, prof.address, prof.diagnosis, prof.treatmentProtocol], db);
+              sex=$4, address=$5,
+              diagnosis=CASE WHEN $8 THEN $6 ELSE diagnosis END, treatment_protocol=CASE WHEN $8 THEN $7 ELSE treatment_protocol END,
+              updated_at=now() WHERE id=$1`,
+      [p.id, name, prof.age, prof.sex, prof.address, prof.diagnosis, prof.treatmentProtocol, clinicalEdit], db);
     // Keep history simple: replace the preferred phone/email values.
     await q(`DELETE FROM patient_contact WHERE patient_id=$1`, [p.id], db);
     await q(`INSERT INTO patient_contact (patient_id, kind, value, preferred) VALUES ($1,'PHONE',$2,true)`, [p.id, phone], db);
     if (email) await q(`INSERT INTO patient_contact (patient_id, kind, value) VALUES ($1,'EMAIL',$2)`, [p.id, email], db);
-    await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "patient.update", targetType: "patient", targetId: p.id, changes: { fields: ["name", "phone", "email", "age", "sex", "address", "diagnosis", "treatment_protocol"] }, correlationId });
+    await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "patient.update", targetType: "patient", targetId: p.id, changes: { fields: ["name", "phone", "email", "age", "sex", "address", ...(clinicalEdit ? ["diagnosis", "treatment_protocol"] : [])] }, correlationId });
   });
 }
 

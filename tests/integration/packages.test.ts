@@ -28,19 +28,19 @@ beforeAll(async () => {
 afterAll(async () => { await getPool().end(); });
 
 describe("patient registration details", () => {
-  it("stores age, sex, address, diagnosis and treatment protocol at registration and on edit", async () => {
+  it("stores age, sex and address at registration and on edit; diagnosis is clinical, not reception's", async () => {
+    await expectCode(createPatient(f.receptionist, { fullName: "Lakshmi R", phone: "98450 22222", diagnosis: "Right knee OA" }, "t"), "FORBIDDEN");
     patientId = (await createPatient(f.receptionist, {
       fullName: "Lakshmi R", phone: "98450 22222", age: "54", sex: "female", address: "12 MG Road, Bengaluru",
-      diagnosis: "Right knee OA", treatmentProtocol: "IFT + quads strengthening",
     }, "t")).patientId;
-    let p = await q1<{ age_years: number; age_recorded_on: string; sex: string; address: string; diagnosis: string; treatment_protocol: string }>(
-      `SELECT age_years, to_char(age_recorded_on,'YYYY-MM-DD') age_recorded_on, sex, address, diagnosis, treatment_protocol FROM patient WHERE id=$1`, [patientId]);
-    expect(p).toMatchObject({ age_years: 54, sex: "FEMALE", address: "12 MG Road, Bengaluru", diagnosis: "Right knee OA", treatment_protocol: "IFT + quads strengthening" });
+    let p = await q1<{ age_years: number; age_recorded_on: string; sex: string; address: string; diagnosis: string | null }>(
+      `SELECT age_years, to_char(age_recorded_on,'YYYY-MM-DD') age_recorded_on, sex, address, diagnosis FROM patient WHERE id=$1`, [patientId]);
+    expect(p).toMatchObject({ age_years: 54, sex: "FEMALE", address: "12 MG Road, Bengaluru", diagnosis: null });
     expect(p!.age_recorded_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
-    await updatePatient(f.receptionist, { patientId, fullName: "Lakshmi R", phone: "98450 22222", age: "", sex: "", address: "", diagnosis: "Bilateral knee OA", treatmentProtocol: "" }, "t");
-    p = await q1(`SELECT age_years, age_recorded_on, sex, address, diagnosis, treatment_protocol FROM patient WHERE id=$1`, [patientId]);
-    expect(p).toMatchObject({ age_years: null, age_recorded_on: null, sex: null, address: null, diagnosis: "Bilateral knee OA", treatment_protocol: null });
+    await updatePatient(f.receptionist, { patientId, fullName: "Lakshmi R", phone: "98450 22222", age: "", sex: "", address: "" }, "t");
+    p = await q1(`SELECT age_years, age_recorded_on, sex, address, diagnosis FROM patient WHERE id=$1`, [patientId]);
+    expect(p).toMatchObject({ age_years: null, age_recorded_on: null, sex: null, address: null, diagnosis: null });
   });
 
   it("rejects an impossible age or unknown sex; name + phone alone still work", async () => {
