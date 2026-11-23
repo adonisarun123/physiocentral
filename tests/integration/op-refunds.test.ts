@@ -257,3 +257,37 @@ describe("reversing an entry made by mistake", () => {
     await expect(db().query(`UPDATE payment SET status='REVERSED', reversed_by='x', reversed_at=now(), reversal_reason='x' WHERE id=$1`, [p.paymentId])).rejects.toMatchObject({ code: "P0005" });
   });
 });
+
+describe("online request from someone already registered", () => {
+  it("staff can put the request on the existing record: one patient, one OP number", async () => {
+    const { attachRequestToPatient, existingPatientMatches } = await import("@/modules/patients/admin");
+    const known = await createPatient(f.receptionist, { fullName: "Returning Person", phone: "98333 00001" }, "t");
+    const knownOp = await op(known.patientId);
+    const start = await futureSlot(f, f.branchB, f.therapist1, 4);
+    const req = await createBookingRequest(bookingPayload(f, { branchId: f.branchB, startsAt: start, therapistId: f.therapist1, fullName: "Returning P", phone: "98333 00001" }), ctx);
+    const appt = (await q1<{ id: string; version: number; patient_id: string }>(`SELECT id, version, patient_id FROM appointment WHERE public_ref=$1`, [req.reference]))!;
+    expect(appt.patient_id).not.toBe(known.patientId);
+
+    const matches = await existingPatientMatches(f.orgId, [appt.patient_id]);
+    expect(matches).toEqual([expect.objectContaining({ request_patient_id: appt.patient_id, id: known.patientId, op_number: knownOp })]);
+
+    await expectCode(attachRequestToPatient(f.physio, { appointmentId: appt.id, expectedVersion: appt.version, patientId: known.patientId }, "t"), "FORBIDDEN");
+    await expectCode(attachRequestToPatient(f.receptionist, { appointmentId: appt.id, expectedVersion: appt.version + 5, patientId: known.patientId }, "t"), "STALE_VERSION");
+    const r = await attachRequestToPatient(f.receptionist, { appointmentId: appt.id, expectedVersion: appt.version, patientId: known.patientId }, "t");
+    expect(r.patientNumber).toBe(formatOpNumber(knownOp));
+
+    const after = (await q1<{ patient_id: string; version: number; status: string }>(`SELECT patient_id, version, status FROM appointment WHERE id=$1`, [appt.id]))!;
+    expect(after).toEqual({ patient_id: known.patientId, version: appt.version + 1, status: "REQUESTED" });
+    expect((await q1<{ archived: boolean; op_number: number | null }>(`SELECT archived, op_number FROM patient WHERE id=$1`, [appt.patient_id]))).toEqual({ archived: true, op_number: null });
+    expect((await q1<{ n: string }>(`SELECT count(*)::text n FROM consent_record WHERE patient_id=$1`, [known.patientId]))!.n).toBe("3");
+    // Accepting now confirms the visit for the existing patient; no new OP number is used.
+    const before = (await q1<{ next_value: number }>(`SELECT next_value FROM patient_op_sequence WHERE organization_id=$1`, [f.orgId]))!.next_value;
+    await acceptAppointment(f.receptionist, { appointmentId: appt.id, expectedVersion: after.version }, "t");
+    expect(await op(known.patientId)).toBe(knownOp);
+    expect((await q1<{ next_value: number }>(`SELECT next_value FROM patient_op_sequence WHERE organization_id=$1`, [f.orgId]))!.next_value).toBe(before);
+    // Once confirmed it can no longer be moved.
+    const conf = (await q1<{ version: number }>(`SELECT version FROM appointment WHERE id=$1`, [appt.id]))!;
+    const other = await createPatient(f.receptionist, { fullName: "Someone Else", phone: "98333 00002" }, "t");
+    await expectCode(attachRequestToPatient(f.receptionist, { appointmentId: appt.id, expectedVersion: conf.version, patientId: other.patientId }, "t"), "INVALID_TRANSITION");
+  });
+});

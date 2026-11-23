@@ -9,7 +9,7 @@ import type { ActionResult } from "@/components/action-form";
 import { acceptAppointment, cancelAppointment, rejectAppointment, transitionAppointment, type TransitionName } from "@/modules/scheduling/appointments";
 import { addEstimateLine, createEstimate, decideEstimate, markEstimateLinePerformed, removeEstimateLine, reviseEstimate, sendEstimateVersion } from "@/modules/billing/estimates";
 import { createDirectInvoice, createDraftInvoice, discardDraftInvoice, issueInvoice } from "@/modules/billing/invoices";
-import { createPatient, updatePatient } from "@/modules/patients/admin";
+import { createPatient, updatePatient, attachRequestToPatient } from "@/modules/patients/admin";
 import { createPackageBooking, createStaffBooking, setPackageStatus } from "@/modules/scheduling/staff-booking";
 import { createStaffLogin, resetStaffPassword, setStaffActive, updateStaff } from "@/modules/staff/admin";
 import { allocatePayment, recordManualPayment, verifyPayment } from "@/modules/payments/manual";
@@ -281,6 +281,13 @@ export async function createPatientAction(_: ActionResult, fd: FormData): Promis
     redirect(next ? `${next}${next.includes("?") ? "&" : "?"}patient=${id}` : `/admin/patients/${id}`);
   }
   return res;
+}
+
+export async function attachRequestToPatientAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const r = await attachRequestToPatient(a, { appointmentId: s(fd, "id"), expectedVersion: n(fd, "version"), patientId: s(fd, "patientId") }, cid);
+    return `Moved to ${r.patientName} (${r.patientNumber}). The extra record was archived.`;
+  }, ["/admin/requests", `/admin/appointments/${s(fd, "id")}`, "/admin/patients", `/admin/patients/${s(fd, "patientId")}`]);
 }
 
 export async function updatePatientAction(_: ActionResult, fd: FormData) {

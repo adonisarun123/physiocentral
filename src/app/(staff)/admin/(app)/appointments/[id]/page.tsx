@@ -7,12 +7,13 @@ import { can } from "@/modules/auth/actor";
 import { PageHeader, StatusBadge, Notice } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { formatINR } from "@/modules/billing/money";
-import { formatDateTime, patientNumber } from "@/lib/format";
+import { formatDateTime, formatOpNumber, patientNumber } from "@/lib/format";
 import { TRANSITIONS } from "@/modules/scheduling/appointments";
 import {
   acceptAction, addEstimateLineAction, cancelAction, createEstimateAction, createInvoiceAction, markPerformedAction,
-  offlineDecisionAction, removeEstimateLineAction, reviseEstimateAction, sendEstimateAction, transitionAction,
+  offlineDecisionAction, removeEstimateLineAction, reviseEstimateAction, sendEstimateAction, transitionAction, attachRequestToPatientAction,
 } from "../../../actions";
+import { existingPatientMatches } from "@/modules/patients/admin";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Appointment" };
@@ -65,6 +66,8 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
       `SELECT id, number, amount_paise, approved_by_name, to_char(refunded_on,'DD Mon YYYY') refunded_on FROM payment_refund WHERE appointment_id=$1 ORDER BY created_at`, [id]),
   ]);
   const paidTotal = paid.reduce((s, x) => s + BigInt(x.amount_paise) - BigInt(x.refunded), 0n);
+  const sameMobile = a.status === "REQUESTED" && can(actor, "APPOINTMENT_ACCEPT") && can(actor, "PATIENT_CONTACT_VIEW")
+    ? await existingPatientMatches(actor.organizationId, [a.patient_id]) : [];
   const closedWithoutVisit = a.status === "CANCELLED" || a.status === "REJECTED";
   const lines = estimates.length
     ? await q<{ id: string; estimate_version_id: string; description: string; quantity: string; total_paise: string; is_extra: boolean; reason: string | null; charge_id: string | null }>(
@@ -102,6 +105,17 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
             {a.accessibility_needs ? <div><dt className="inline font-semibold">Access needs: </dt><dd className="inline">{a.accessibility_needs}</dd></div> : null}
             {a.internal_note ? <div><dt className="inline font-semibold">Internal note: </dt><dd className="inline">{a.internal_note}</dd></div> : null}
           </dl>
+          {sameMobile.length ? (
+            <div className="mt-4"><Notice tone="warn" title="This mobile number is already on a patient record">
+              <p>If it is the same person, use their record so they keep one OP number. If it is a family member, accept as it is.</p>
+              <ul className="mt-2 space-y-2">{sameMobile.map((m) => (
+                <li key={m.id} className="flex flex-wrap items-center gap-3">
+                  <span><Link href={`/admin/patients/${m.id}`} className="font-semibold">{m.full_name}</Link> <span className="font-mono text-sm">{formatOpNumber(m.op_number)}</span></span>
+                  <ActionForm action={attachRequestToPatientAction} confirm={`Put this request on ${m.full_name}'s record?`}>{hidden}<input type="hidden" name="patientId" value={m.id} /><SubmitButton small variant="secondary">Use this record</SubmitButton></ActionForm>
+                </li>
+              ))}</ul>
+            </Notice></div>
+          ) : null}
           <div className="mt-4 flex flex-wrap gap-2">
             {a.status === "REQUESTED" && can(actor, "APPOINTMENT_ACCEPT") ? (
               <ActionForm action={acceptAction}>{hidden}<SubmitButton small>Accept original terms</SubmitButton></ActionForm>

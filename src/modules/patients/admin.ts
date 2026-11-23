@@ -138,3 +138,65 @@ export const CURRENT_AGE_SQL = `CASE WHEN p.age_years IS NULL THEN NULL
 export function sexLabel(v: string | null | undefined) {
   return SEX_OPTIONS.find((o) => o.value === v)?.label ?? null;
 }
+
+export interface ExistingMatch { request_patient_id: string; id: string; full_name: string; op_number: number; public_ref: string }
+
+/**
+ * An online request always starts a fresh patient record (the channel is
+ * unverified). This finds patients already on the books with the same mobile,
+ * so staff can attach the request to them instead of creating a second record
+ * and a second OP number. A shared phone is common in families, so it is only
+ * ever a suggestion for staff to confirm.
+ */
+export async function existingPatientMatches(orgId: string, requestPatientIds: string[]) {
+  if (!requestPatientIds.length) return [];
+  return q<ExistingMatch>(
+    `SELECT DISTINCT rc.patient_id request_patient_id, p.id, p.full_name, p.op_number, p.public_ref
+       FROM patient_contact rc
+       JOIN patient_contact c ON c.kind='PHONE' AND c.value=rc.value AND c.patient_id <> rc.patient_id
+       JOIN patient p ON p.id=c.patient_id AND p.organization_id=$1 AND NOT p.archived AND p.op_number IS NOT NULL
+      WHERE rc.kind='PHONE' AND rc.patient_id = ANY($2::uuid[])
+      ORDER BY p.op_number`,
+    [orgId, requestPatientIds],
+  );
+}
+
+/**
+ * Attach a pending online request to a patient who is already registered.
+ * Only while the request is still unconfirmed, and only when the record the
+ * request created has nothing else on it; that record is then archived.
+ */
+export async function attachRequestToPatient(actor: Actor, input: { appointmentId: string; expectedVersion: number; patientId: string }, correlationId: string) {
+  assertPermission(actor, "APPOINTMENT_ACCEPT");
+  assertPermission(actor, "PATIENT_CONTACT_VIEW");
+  return tx(async (db) => {
+    const appt = await q1<{ id: string; status: string; version: number; patient_id: string }>(
+      `SELECT id, status, version, patient_id FROM appointment WHERE id=$1 AND organization_id=$2 FOR UPDATE`, [input.appointmentId, actor.organizationId], db);
+    if (!appt) throw new DomainError("NOT_FOUND", "Appointment not found.");
+    if (appt.version !== input.expectedVersion) throw new DomainError("STALE_VERSION", "This appointment was changed by someone else. Reload to see the latest version.");
+    if (appt.status !== "REQUESTED") throw new DomainError("INVALID_TRANSITION", "Only a request that has not been confirmed yet can be moved to another patient record.");
+    if (appt.patient_id === input.patientId) throw new DomainError("VALIDATION", "This request is already on that patient's record.");
+    // Lock both records in id order so two staff doing this at once cannot deadlock.
+    const locked = await q<{ id: string; full_name: string; archived: boolean; op_number: number | null; public_ref: string }>(
+      `SELECT id, full_name, archived, op_number, public_ref FROM patient WHERE id = ANY($1::uuid[]) AND organization_id=$2 ORDER BY id FOR UPDATE`,
+      [[appt.patient_id, input.patientId], actor.organizationId], db);
+    const fresh = locked.find((p) => p.id === appt.patient_id);
+    const target = locked.find((p) => p.id === input.patientId);
+    if (!fresh || !target || target.archived) throw new DomainError("NOT_FOUND", "Patient not found.");
+    const used = (await q1<{ n: string }>(
+      `SELECT ((SELECT count(*) FROM appointment WHERE patient_id=$1 AND id <> $2) + (SELECT count(*) FROM payment WHERE patient_id=$1)
+             + (SELECT count(*) FROM invoice WHERE patient_id=$1) + (SELECT count(*) FROM estimate WHERE patient_id=$1)
+             + (SELECT count(*) FROM billable_charge WHERE patient_id=$1) + (SELECT count(*) FROM patient_package WHERE patient_id=$1))::text n`,
+      [fresh.id, appt.id], db))!;
+    if (fresh.op_number != null || used.n !== "0") {
+      throw new DomainError("INVALID_TRANSITION", "The record this request came in on already has visits or bills of its own, so it cannot be merged from here.");
+    }
+    await q(`UPDATE appointment SET patient_id=$2, version=version+1, updated_at=now() WHERE id=$1`, [appt.id, target.id], db);
+    // The privacy acknowledgement and contact consents given with this request belong to the person, so they move too.
+    await q(`UPDATE consent_record SET patient_id=$2 WHERE patient_id=$1`, [fresh.id, target.id], db);
+    await q(`UPDATE patient SET archived=true, updated_at=now() WHERE id=$1`, [fresh.id], db);
+    await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "appointment.use_existing_patient", targetType: "appointment", targetId: appt.id,
+      changes: { fromPatient: fresh.id, toPatient: target.id }, correlationId });
+    return { patientName: target.full_name, patientNumber: patientNumber(target) };
+  });
+}
