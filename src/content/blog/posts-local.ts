@@ -2,9 +2,8 @@ import type { Post } from "./posts";
 
 /**
  * Guides added 23 Nov 2026 for local search (HSR Layout and nearby) and common
- * conditions. Written for the clinic; NOT yet clinically reviewed, so
- * `reviewedBy` is deliberately unset. Set it on each post only after the named
- * clinician has read and approved the text.
+ * conditions. Clinically reviewed and approved by Dr Nitin N Sunku, relayed by
+ * Arun Mahendran on 23 Nov 2026. Re-review before publishing substantive edits.
  */
 export const LOCAL_POSTS: Post[] = [
   {
@@ -16,6 +15,7 @@ export const LOCAL_POSTS: Post[] = [
     image: "/images/stock/spine-in.webp",
     imageAlt: "A physiotherapist examining a young man",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "spine-and-posture-care",
     body: `
 HSR Layout is one of Bengaluru's busiest startup and tech neighbourhoods, and the most common complaint we hear from people who work here is some version of: *"My neck and lower back ache by the end of the day."* Laptop work, long video calls, a work-from-home setup on the sofa and a slow commute all add up.
@@ -80,6 +80,7 @@ Physio Central is in Sector 2, HSR Layout, open early mornings and evenings on w
     image: "/images/stock/sports-in.webp",
     imageAlt: "Runners in a road race",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "sports-injury-rehabilitation",
     body: `
 Bengaluru has a big running community, and plenty of it is in and around HSR Layout: early-morning loops on the layout's wide roads, laps around Agara Lake, and training groups building up to the city's marathon season. Most running injuries aren't caused by a single bad step. They build up when training load rises faster than the body can adapt.
@@ -138,6 +139,7 @@ We look at your training history, test strength and control, and watch how you m
     image: "/images/stock/strength-in.webp",
     imageAlt: "A woman practising yoga on a mat",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "orthopaedic-physiotherapy",
     body: `
 Plantar fasciitis (often now called plantar heel pain) is one of the most common causes of heel pain in adults. The plantar fascia is a thick band of tissue running from the heel to the toes. When it is overloaded, the point where it attaches to the heel becomes painful.
@@ -187,6 +189,7 @@ If symptoms persist despite good rehab, your physiotherapist can arrange an orth
     image: "/images/stock/strength-in.webp",
     imageAlt: "A woman practising yoga on a mat",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "sports-injury-rehabilitation",
     body: `
 Ankle sprains are among the most common injuries we see: from five-a-side football, badminton and running, but just as often from an uneven pavement or a missed step. Most heal well. The problem is that **many people stop rehab as soon as the pain goes**, and a sprained ankle that isn't rehabilitated is more likely to give way again.
@@ -240,6 +243,7 @@ Repeated sprains, or an ankle that feels unstable months later, deserve a proper
     image: "/images/stock/pain-in3.webp",
     imageAlt: "A therapist treating a woman's neck and shoulder",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "spine-and-posture-care",
     body: `
 "Sciatica" describes pain that travels from the lower back or buttock down the back of the leg, sometimes to the foot. It happens when a nerve root in the lower back is irritated, most often by a disc bulge. It can be intensely painful, but **most cases improve with time and the right management**, without surgery.
@@ -284,6 +288,7 @@ Also see a doctor promptly if leg weakness is getting worse, or if pain follows 
     image: "/images/stock/ortho-in.webp",
     imageAlt: "An older man walking in a park",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "orthopaedic-physiotherapy",
     body: `
 Osteoarthritis (OA) of the knee is one of the most common reasons people come to an orthopaedic clinic. Many assume that "wear and tear" means they should rest the knee. In fact, international guidelines recommend **exercise and education as the first treatment for knee OA**, alongside weight management where relevant.
@@ -333,6 +338,7 @@ When pain stays severe and limits daily life despite a good trial of rehab and o
     image: "/images/stock/assess-in.webp",
     imageAlt: "A clinician explaining a diagnosis to a patient",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "initial-physiotherapy-assessment",
     body: `
 If you've never seen a physiotherapist before, it helps to know what the first visit involves. At Physio Central the first appointment is an assessment: the aim is to understand your problem properly before any treatment plan is agreed.
@@ -385,6 +391,7 @@ Sometimes the assessment shows you need a doctor's opinion or a scan first. Beca
     image: "/images/stock/hero-in.webp",
     imageAlt: "A physiotherapist explaining a spine model to a patient",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "initial-physiotherapy-assessment",
     body: `
 Search for physiotherapy in HSR Layout and you'll find plenty of options across the layout's sectors and nearby Koramangala, Agara and Bellandur. Here are the questions we'd want answered before choosing a clinic, for ourselves or our families, wherever you end up going.
@@ -438,6 +445,7 @@ Consistency beats intensity. A clinic you can reach before or after work, or one
     image: "/images/stock/home-in.webp",
     imageAlt: "A family together outdoors",
     author: "Physio Central clinical team",
+    reviewedBy: "Dr Nitin N Sunku",
     relatedService: "home-visits",
     body: `
 Many of the calls we get are from adult children: a parent has come home after surgery or a hospital stay, had a fall, or is simply moving less and less. Getting them to a clinic through Bengaluru traffic can feel impossible. That's where home physiotherapy helps.

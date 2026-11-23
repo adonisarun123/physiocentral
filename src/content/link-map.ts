@@ -148,7 +148,7 @@ export const LINK_MAP: Record<string, LinkRecord[]> = {
   ],
   [post("frozen-shoulder-stages-and-treatment")]: [],
 
-  // Guides added 2026-11-23 (local + condition guides). Added by Arun Mahendran; pending Dr Sunku's review.
+  // Guides added 2026-11-23 (local + condition guides). Added by Arun Mahendran; guides approved by Dr Sunku (relayed 2026-11-23).
   [post("desk-job-neck-and-back-pain-hsr-layout")]: [
     { to: svc("pain-management-and-manual-therapy"), anchor: "Pain management and manual therapy", why: "The guide describes treating stiff joints and tight muscles.", approved: true },
   ],
