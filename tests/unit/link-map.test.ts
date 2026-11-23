@@ -4,6 +4,7 @@ import { POSTS } from "@/content/blog/posts";
 import { isRelatedToProp, relatedLinkProp } from "@/modules/content/schema";
 import { SERVICES } from "../../scripts/content/services";
 import { CONDITION_GROUPS } from "@/content/conditions";
+import { AREAS } from "@/content/areas";
 
 const serviceSlugs = new Set(SERVICES.map((s) => s.slug));
 const postSlugs = new Set(POSTS.map((p) => p.slug));
@@ -75,6 +76,15 @@ describe("editorial link map", () => {
     for (const g of CONDITION_GROUPS) for (const c of g.conditions) {
       expect(serviceSlugs.has(c.service), `${c.name} -> ${c.service}`).toBe(true);
       if (c.guide) expect(postSlugs.has(c.guide), `${c.name} -> ${c.guide}`).toBe(true);
+    }
+  });
+
+  it("area pages have unique slugs, their own copy, and links that resolve", () => {
+    expect(new Set(AREAS.map((a) => a.slug)).size).toBe(AREAS.length);
+    expect(new Set(AREAS.map((a) => a.intro)).size, "each area needs its own intro").toBe(AREAS.length);
+    for (const a of AREAS) {
+      expect(a.slug).toMatch(/^[a-z0-9-]+$/);
+      for (const p of a.commonProblems) expect(resolves(p.href) || p.href === "/conditions", `${a.slug} -> ${p.href}`).toBe(true);
     }
   });
 

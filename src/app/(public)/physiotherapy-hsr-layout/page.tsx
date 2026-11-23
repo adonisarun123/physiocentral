@@ -9,6 +9,7 @@ import { PageHero } from "@/components/site/page-hero";
 import { MediaPanel, serviceImage } from "@/components/site/media";
 import { ORTHO } from "@/components/site/ortho-referral";
 import { getPost } from "@/content/blog/posts";
+import { AREAS } from "@/content/areas";
 import { pageOpenGraph } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -150,6 +151,10 @@ export default async function HsrLayoutPage() {
             {directionsUrl ? <a href={directionsUrl} target="_blank" rel="noopener" className="btn btn-primary"><Navigation size={18} aria-hidden="true" /> Get directions</a> : null}
             <Link href="/contact" className="btn btn-secondary">Contact &amp; visit</Link>
           </div>
+          <p className="body-medium mt-6 text-[var(--color-ink-muted)]">
+            Coming from further away? See how to reach us, and where we offer home visits, from{" "}
+            {AREAS.map((a, i) => <span key={a.slug}>{i ? (i === AREAS.length - 1 ? " and " : ", ") : ""}<Link href={`/physiotherapy/${a.slug}`}>{a.name}</Link></span>)}.
+          </p>
           {mapQuery ? (
             <div className="mt-8 overflow-hidden rounded-[var(--md-sys-shape-xl)] border border-[var(--color-line)] bg-[var(--md-sys-color-surface-container)]">
               <iframe title="Map showing Physio Central in HSR Layout" src={`https://www.google.com/maps?q=${encodeURIComponent(mapQuery)}&output=embed&z=16`} className="block h-[20rem] w-full" loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen />

@@ -100,6 +100,7 @@ export default async function PublicLayout({ children }: { children: React.React
               {NAV.map((n) => <li key={n.href}><Link href={n.href} className="muted no-underline hover:text-white hover:underline">{n.label}</Link></li>)}
               <li><Link href="/conditions" className="muted no-underline hover:text-white hover:underline">Conditions we treat</Link></li>
               <li><Link href="/physiotherapy-hsr-layout" className="muted no-underline hover:text-white hover:underline">Physiotherapy in HSR Layout</Link></li>
+              <li><Link href="/physiotherapy" className="muted no-underline hover:text-white hover:underline">Areas we serve</Link></li>
               <li><Link href="/book" className="muted no-underline hover:text-white hover:underline">Book online</Link></li>
               <li><a href={ORTHO.url} target="_blank" rel="noopener" className="muted no-underline hover:text-white hover:underline">Orthopaedic consultation ↗</a></li>
             </ul>
