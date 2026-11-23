@@ -28,6 +28,7 @@ export default async function ChartPage({ params }: { params: Promise<{ patientI
     <>
       <PageHeader title={c.patient.full_name} lead={<><span className="font-mono font-semibold">{patientNumber(c.patient)}</span>{c.legacy.age != null || c.legacy.sex ? ` · ${[c.legacy.age != null ? `${c.legacy.age} yrs` : null, sexLabel(c.legacy.sex)].filter(Boolean).join(", ")}` : ""} · Clinical record</>}>
         {can(actor, "PATIENT_CONTACT_VIEW") ? <Link href={`/admin/patients/${c.patient.id}`} className="btn btn-secondary btn-sm">Contact &amp; billing</Link> : null}
+        {can(actor, "AUDIT_VIEW") ? <Link href={`/admin/audit?category=all&patient=${c.patient.id}`} className="btn btn-secondary btn-sm">Who accessed this record</Link> : null}
       </PageHeader>
 
       <div className="grid gap-6 xl:grid-cols-2">

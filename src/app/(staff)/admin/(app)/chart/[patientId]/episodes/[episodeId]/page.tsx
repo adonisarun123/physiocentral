@@ -80,7 +80,7 @@ export default async function EpisodePage({ params }: { params: Promise<{ patien
           {d.notes.length === 0 ? <p className="mt-2 text-sm text-[var(--color-ink-muted)]">No notes yet. Notes are written from the appointment, in its Treatment section.</p> : null}
           <div className="mt-2 grid gap-3">{d.notes.map((n) => (
             <div key={n.id}>
-              <SignedNote n={n} ctx={ctx} canAddend={d.canWrite} heading={`${formatDate(n.visit_at, n.timezone)} · ${n.service}`} />
+              <SignedNote n={n} ctx={ctx} canAddend={d.canWrite} heading={`${formatDate(n.visit_at, n.timezone)} · ${n.service}`} review={{ canReview: d.canReview, myStaffId: d.myStaffId }} />
               <p className="mt-1 text-sm"><Link href={`/admin/appointments/${n.appointment_id}`}>Open visit</Link></p>
             </div>
           ))}</div>

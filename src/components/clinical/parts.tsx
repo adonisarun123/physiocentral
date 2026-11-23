@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { ActionForm, SubmitButton } from "@/components/action-form";
 import { formatDate, formatDateTime } from "@/lib/format";
 import {
-  addendumAction, addGoalAction, addMeasurementAction, createEpisodeAction, goalProgressAction, recordIntakeAction, revisePlanAction, saveNoteAction, voidMeasurementAction,
+  addendumAction, reviewNoteAction, addGoalAction, addMeasurementAction, createEpisodeAction, goalProgressAction, recordIntakeAction, revisePlanAction, saveNoteAction, voidMeasurementAction,
 } from "@/app/(staff)/admin/clinical-actions";
 import { BODY_REGIONS, GOAL_STATUSES, MEASUREMENT_KINDS, SIDES, UNITS, UNIT_KEYS, formatMeasure, goalStatusLabel, kindLabel, sideLabel } from "@/modules/clinical/constants";
 import type { GoalView, NoteView } from "@/modules/clinical/read";
@@ -102,7 +102,8 @@ export function NoteBody({ n }: { n: Pick<NoteView, "subjective" | "objective" |
   );
 }
 
-export function SignedNote({ n, ctx, canAddend, heading }: { n: NoteView; ctx: Ctx; canAddend: boolean; heading?: string }) {
+export function SignedNote({ n, ctx, canAddend, heading, review }: { n: NoteView; ctx: Ctx; canAddend: boolean; heading?: string; review?: { canReview: boolean; myStaffId: string } }) {
+  const iReviewed = !!review && n.reviews.some((r) => r.reviewer_staff_id === review.myStaffId);
   return (
     <article className="rounded-lg border border-[var(--color-line)] p-4">
       <header>
@@ -118,6 +119,23 @@ export function SignedNote({ n, ctx, canAddend, heading }: { n: NoteView; ctx: C
             <div key={x.id} className="mt-2"><p className="text-sm font-semibold">Addendum · {x.author_name} · {formatDateTime(x.created_at, n.timezone)}</p><p className="whitespace-pre-line">{x.body}</p></div>
           ))}
         </section>
+      ) : null}
+      {n.reviews.length ? (
+        <p className="mt-2 text-sm">{n.reviews.map((r) => (
+          <span key={r.id} className="mr-3 inline-block rounded bg-[var(--color-ok-soft)] px-2 py-0.5 text-[var(--color-ok)]">
+            ✓ Countersigned by {r.reviewer_name}, {formatDateTime(r.created_at, n.timezone)}{r.comment ? ` — ${r.comment}` : ""}</span>
+        ))}</p>
+      ) : null}
+      {review?.canReview && n.status === "SIGNED" && n.author_staff_id !== review.myStaffId && !iReviewed ? (
+        <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold">Countersign as clinical lead</summary>
+          <ActionForm action={reviewNoteAction} className="mt-2 flex flex-wrap items-end gap-2">
+            <Hidden {...ctx} /><input type="hidden" name="noteId" value={n.id} />
+            <div className="min-w-64 flex-1"><label className="field-label" htmlFor={`rv-${n.id}`}>Comment (optional)</label>
+              <input id={`rv-${n.id}`} name="comment" maxLength={1000} className="input" placeholder="e.g. Agree; progress load next week" /></div>
+            <SubmitButton small>Countersign</SubmitButton>
+          </ActionForm>
+          <p className="mt-1 text-xs text-[var(--color-ink-muted)]">The note stays as {n.author_name} signed it. To correct it, add an addendum.</p>
+        </details>
       ) : null}
       {canAddend && n.status === "SIGNED" ? (
         <details className="mt-3"><summary className="cursor-pointer text-sm font-semibold">Add an addendum</summary>

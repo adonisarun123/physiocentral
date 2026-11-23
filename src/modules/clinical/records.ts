@@ -474,3 +474,33 @@ export async function voidMeasurement(actor: Actor, input: { measurementId: stri
     await audit(db, { organizationId: a.organizationId, actor: a.label, action: "clinical.measurement.void", targetType: "assessment_measurement", targetId: m.id, correlationId });
   });
 }
+
+// ─────────────────────────── Clinical lead review ───────────────────────────
+
+/**
+ * The clinical lead countersigns a colleague's signed note ("reviewed by").
+ * The note text and its author never change; corrections go in an addendum.
+ */
+export async function reviewNote(actor: Actor, input: { noteId: string; comment?: string | null }, correlationId: string) {
+  const comment = text(input.comment, 1000, "Review comment", "comment");
+  return tx(async (db) => {
+    assertPermission(actor, "CLINICAL_RECORDS_ALL");
+    if (!/^[0-9a-f-]{36}$/i.test(input.noteId)) throw new DomainError("NOT_FOUND", "Note not found.");
+    const n = await q1<{ id: string; patient_id: string; status: string; author_staff_id: string }>(
+      `SELECT id, patient_id, status, author_staff_id FROM clinical_note WHERE id=$1 AND organization_id=$2 FOR UPDATE`, [input.noteId, actor.organizationId], db);
+    if (!n) throw new DomainError("NOT_FOUND", "Note not found.");
+    const { actor: a } = await assertCareTeam(actor, n.patient_id, "CLINICAL_NOTES_READ", db);
+    if (n.status !== "SIGNED") throw new DomainError("INVALID_TRANSITION", "Only a signed note can be countersigned.");
+    if (n.author_staff_id === a.staffId) throw new DomainError("VALIDATION", "You wrote this note, so you can't countersign it.");
+    try {
+      const r = (await q1<{ id: string }>(
+        `INSERT INTO clinical_note_review (note_id, reviewer_staff_id, reviewer_name, comment) VALUES ($1,$2,$3,$4) RETURNING id`,
+        [n.id, a.staffId, a.displayName, comment], db))!;
+      await audit(db, { organizationId: a.organizationId, actor: a.label, action: "clinical.note.review", targetType: "clinical_note", targetId: n.id, changes: { reviewId: r.id }, correlationId });
+      return { reviewId: r.id };
+    } catch (e) {
+      if (pgErrorCode(e) === "23505") throw new DomainError("DUPLICATE", "You have already countersigned this note.");
+      throw e;
+    }
+  });
+}

@@ -58,13 +58,13 @@ export function TreatmentSection({ p, patientId, myName }: { p: Panel; patientId
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div>
           <h3 className="font-semibold">Previous signed note</h3>
-          {p.previous ? <SignedNote n={p.previous} ctx={ctx} canAddend={false} /> : <p className="text-sm text-[var(--color-ink-muted)]">None — this is the first documented visit{ep ? " in this episode" : ""}.</p>}
+          {p.previous ? <SignedNote n={p.previous} ctx={ctx} canAddend={false} review={{ canReview: p.canReview, myStaffId: p.myStaffId }} /> : <p className="text-sm text-[var(--color-ink-muted)]">None — this is the first documented visit{ep ? " in this episode" : ""}.</p>}
         </div>
         <div>
           <h3 className="font-semibold">Today&apos;s note</h3>
           {!ep ? <p className="text-sm text-[var(--color-ink-muted)]">File the visit under an episode to start the note.</p>
             : editable ? <NoteEditor ctx={{ ...ctx, appointmentId: apptId }} draft={p.today} canSign={["CHECKED_IN", "IN_PROGRESS", "COMPLETED"].includes(p.appointment.status)} />
-            : p.today ? <SignedNote n={p.today} ctx={ctx} canAddend={p.canFile} />
+            : p.today ? <SignedNote n={p.today} ctx={ctx} canAddend={p.canFile} review={{ canReview: p.canReview, myStaffId: p.myStaffId }} />
             : <p className="text-sm text-[var(--color-ink-muted)]">No note yet{p.isAssigned ? " — a note can be written once the visit is confirmed." : "."}</p>}
         </div>
       </div>

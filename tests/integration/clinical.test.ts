@@ -271,3 +271,75 @@ describe("#4 goals, plan and signed session notes", () => {
     for (const phrase of ["Pain 7/10", "Correction", "Quads", "Knee pain on stairs", "Climb one flight"]) expect(text).not.toContain(phrase);
   });
 });
+
+describe("clinical lead: every patient's record, countersigning, overview and audit", () => {
+  let lead: StaffActor;
+  let stranger: string;
+  let signedNote: string;
+
+  beforeAll(async () => {
+    // A third therapist profile for the lead, who has never treated this clinic's patients.
+    const db = getPool();
+    const r = (await db.query(`INSERT INTO resource (organization_id, kind, label) VALUES ($1,'THERAPIST','Lead') RETURNING id`, [f.orgId])).rows[0];
+    const t = (await db.query(`INSERT INTO therapist (organization_id, resource_id, slug, display_name, designation) VALUES ($1,$2,'lead','Dr Lead','Physiotherapist') RETURNING id`, [f.orgId, r.id])).rows[0];
+    lead = await staff("Dr Lead", ["CLINICAL_LEAD", "PHYSIOTHERAPIST"], t.id);
+    stranger = (await createPatient(frontDesk, { fullName: "Never Treated By Lead", phone: "98860 20001" }, "t")).patientId;
+    const start = await futureSlot(f, f.branchA, f.therapist1, 17, 0);
+    const v = (await createStaffBooking(frontDesk, { patientId: stranger, serviceId: f.sessionSvc, therapistId: f.therapist1, startsAt: start, source: "PHONE" }, "t")).appointmentId;
+    const ep = (await createEpisode(asha, { patientId: stranger, title: "Neck pain", appointmentId: v, openedOn: await daysAgo(3) }, "t")).episodeId;
+    await checkIn(v);
+    const d = await saveNoteDraft(asha, { appointmentId: v, subjective: "Stiff neck", assessment: "Mechanical neck pain" }, "t");
+    await signNote(asha, { noteId: d.noteId, expectedVersion: d.version }, "t");
+    signedNote = d.noteId;
+    void ep;
+  });
+
+  it("opens any patient's record; owner and a care-team-only physio still cannot", async () => {
+    expect((await getChart(lead, stranger)).episodes.map((e) => e.title)).toEqual(["Neck pain"]);
+    expect(await canOpenChart(lead, stranger)).toBe(true);
+    await expectCode(getChart(ravi, stranger), "FORBIDDEN");
+    await expectCode(getChart(f.owner, stranger), "FORBIDDEN");
+  });
+
+  it("the role only works with a linked therapist profile, and can only be granted to one", async () => {
+    const detached = await staff("Detached Lead", ["CLINICAL_LEAD"]);
+    await expectCode(getChart(detached, stranger), "FORBIDDEN");
+    const { updateStaff } = await import("@/modules/staff/admin");
+    const target = await staff("No Profile", ["RECEPTIONIST"]);
+    await expectCode(updateStaff(f.owner, { staffId: target.staffId, name: "No Profile", roles: ["RECEPTIONIST", "CLINICAL_LEAD"] }, "t"), "VALIDATION");
+  });
+
+  it("countersigns a colleague's signed note without changing it; once only; never their own", async () => {
+    const { reviewNote } = await import("@/modules/clinical/records");
+    await expectCode(reviewNote(asha, { noteId: signedNote }, "t"), "FORBIDDEN"); // not a clinical lead
+    await reviewNote(lead, { noteId: signedNote, comment: "Agree" }, "t");
+    await expectCode(reviewNote(lead, { noteId: signedNote }, "t"), "DUPLICATE");
+    const n = (await getChart(lead, stranger)).episodes[0];
+    const e = await getEpisode(lead, n.id);
+    expect(e.notes[0].reviews.map((r) => r.reviewer_name)).toEqual(["Dr Lead"]);
+    expect(e.notes[0].author_name).toBe("Asha (physio)");
+    expect(e.notes[0].subjective).toBe("Stiff neck");
+    await expectDbRefusal(`DELETE FROM clinical_note_review WHERE note_id=$1`, [signedNote]);
+    // The lead cannot write a note for a visit assigned to someone else.
+    await expectCode(saveNoteDraft(lead, { appointmentId: e.notes[0].appointment_id, subjective: "x" }, "t"), "FORBIDDEN");
+  });
+
+  it("the overview shows drafts, undocumented visits and notes awaiting countersign", async () => {
+    const { getClinicalOverview } = await import("@/modules/clinical/overview");
+    const o = await getClinicalOverview(lead);
+    expect(o.drafts.length).toBeGreaterThan(0);                       // visit-3 draft from earlier
+    expect(o.toReview.some((x) => x.note_id === signedNote)).toBe(false); // already countersigned
+    expect(o.toReview.length).toBeGreaterThan(0);                      // Meena's signed notes
+    expect(o.caseload.find((c) => c.therapist === "Asha")).toBeTruthy();
+    await expectCode(getClinicalOverview(asha), "FORBIDDEN");
+  });
+
+  it("the audit history records who opened which chart, without clinical text", async () => {
+    const { listAuditEvents } = await import("@/modules/audit/view");
+    const rows = await listAuditEvents(lead, { category: "clinical", patientId: stranger });
+    expect(rows.some((r) => r.action === "clinical.chart.view" && r.actor_name === "Dr Lead")).toBe(true);
+    expect(rows.some((r) => r.action === "clinical.note.review" && r.patient === "Never Treated By Lead")).toBe(true);
+    expect(JSON.stringify(rows)).not.toContain("Stiff neck");
+    await expectCode(listAuditEvents(asha, { category: "clinical" }), "FORBIDDEN");
+  });
+});

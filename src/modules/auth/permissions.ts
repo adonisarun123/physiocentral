@@ -2,6 +2,8 @@
  * Action-based permissions (§2.1). Roles are presets mapping to permission sets;
  * components and services check permissions, never role strings.
  * Note: OWNER does not imply clinical-note access (no CLINICAL_NOTES_READ).
+ * CLINICAL_LEAD adds CLINICAL_RECORDS_ALL: every patient's clinical record, not
+ * only the patients on the holder's care team, plus the audit history.
  * PAYMENT_REFUND is held by the front desk as well as the owner: the clinic lets
  * either approve a refund, and every refund records who approved it.
  */
@@ -13,6 +15,7 @@ export const PERMISSIONS = [
   "PATIENT_CONTACT_VIEW",
   "CLINICAL_NOTES_READ",
   "CLINICAL_NOTES_WRITE",
+  "CLINICAL_RECORDS_ALL",
   "BILLABLE_PROPOSE",
   "CATALOG_MANAGE",
   "PRICE_MANAGE",
@@ -32,7 +35,7 @@ export const PERMISSIONS = [
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
-export const ROLES = ["OWNER", "CLINIC_ADMIN", "RECEPTIONIST", "PHYSIOTHERAPIST", "BILLING", "ACCOUNTANT", "CONTENT_EDITOR"] as const;
+export const ROLES = ["OWNER", "CLINIC_ADMIN", "RECEPTIONIST", "PHYSIOTHERAPIST", "BILLING", "ACCOUNTANT", "CONTENT_EDITOR", "CLINICAL_LEAD"] as const;
 export type Role = (typeof ROLES)[number];
 
 export const ROLE_PRESETS: Record<Role, readonly Permission[]> = {
@@ -61,6 +64,7 @@ export const ROLE_PRESETS: Record<Role, readonly Permission[]> = {
   ],
   ACCOUNTANT: ["FINANCE_VIEW", "TAX_CONFIGURE", "AUDIT_VIEW", "PRICE_MANAGE"],
   CONTENT_EDITOR: ["CATALOG_MANAGE"],
+  CLINICAL_LEAD: ["CLINICAL_NOTES_READ", "CLINICAL_NOTES_WRITE", "CLINICAL_RECORDS_ALL", "AUDIT_VIEW"],
 };
 
 export function permissionsFor(roles: readonly string[]): Set<Permission> {

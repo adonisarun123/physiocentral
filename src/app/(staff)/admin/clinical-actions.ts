@@ -8,7 +8,7 @@ import type { StaffActor } from "@/modules/auth/actor";
 import type { ActionResult } from "@/components/action-form";
 import {
   addAddendum, addGoal, addMeasurement, createEpisode, dischargeEpisode, linkAppointmentToEpisode, recordGoalProgress,
-  recordIntake, revisePlan, saveNoteDraft, signNote, voidMeasurement,
+  recordIntake, reviewNote, revisePlan, saveNoteDraft, signNote, voidMeasurement,
 } from "@/modules/clinical/records";
 
 /* Clinical record actions. Authorisation and care-team checks live in the services. */
@@ -150,4 +150,11 @@ export async function voidMeasurementAction(_: ActionResult, fd: FormData) {
     await voidMeasurement(a, { measurementId: s(fd, "measurementId"), reason: s(fd, "reason") }, cid);
     return "Marked as entered in error.";
   }, paths(fd));
+}
+
+export async function reviewNoteAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    await reviewNote(a, { noteId: s(fd, "noteId"), comment: opt(fd, "comment") }, cid);
+    return "Countersigned.";
+  }, [...paths(fd), "/admin/clinical"]);
 }

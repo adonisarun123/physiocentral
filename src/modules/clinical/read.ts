@@ -1,5 +1,6 @@
 import "server-only";
-import { q, q1 } from "@/lib/db";
+import { getPool, q, q1 } from "@/lib/db";
+import { audit } from "@/modules/audit";
 import { DomainError } from "@/lib/errors";
 import type { StaffActor } from "@/modules/auth/actor";
 import { assertCareTeam, therapistIdFor } from "./access";
@@ -20,8 +21,15 @@ const EPISODE_SUMMARY_SQL = `
          (SELECT to_char(r.next_reassessment_on,'YYYY-MM-DD') FROM care_plan_revision r WHERE r.episode_id=e.id ORDER BY r.created_at DESC LIMIT 1) next_reassessment_on
     FROM care_episode e LEFT JOIN therapist t ON t.id=e.lead_therapist_id`;
 
+/** Who opened which clinical record and when (feature #10). No clinical content is logged. */
+async function logView(actor: StaffActor, action: string, patientId: string, detail: Record<string, unknown> = {}) {
+  await audit(getPool(), { organizationId: actor.organizationId, actor: actor.label, action, targetType: "patient", targetId: patientId,
+    changes: { ...detail, wideAccess: actor.permissions.has("CLINICAL_RECORDS_ALL") } });
+}
+
 export async function getChart(actor: StaffActor, patientId: string) {
   const { patient } = await assertCareTeam(actor, patientId, "CLINICAL_NOTES_READ");
+  await logView(actor, "clinical.chart.view", patient.id);
   const [legacy, episodes, intakes, visits] = await Promise.all([
     q1<{ diagnosis: string | null; treatment_protocol: string | null; age: number | null; sex: string | null }>(
       `SELECT diagnosis, treatment_protocol, CASE WHEN age_years IS NULL THEN NULL ELSE age_years + EXTRACT(YEAR FROM age(current_date, COALESCE(age_recorded_on, current_date)))::int END age, sex
@@ -44,10 +52,11 @@ export interface NoteView {
   subjective: string | null; objective: string | null; assessment: string | null; plan: string | null; interventions: string | null; patient_response: string | null;
   signed_at: Date | null; created_at: Date; updated_at: Date; visit_at: Date; service: string; timezone: string;
   addenda: { id: string; author_name: string; body: string; created_at: Date }[];
+  reviews: { id: string; reviewer_name: string; reviewer_staff_id: string; comment: string | null; created_at: Date }[];
 }
 
 async function notesWithAddenda(where: string, params: unknown[]): Promise<NoteView[]> {
-  const notes = await q<Omit<NoteView, "addenda">>(
+  const notes = await q<Omit<NoteView, "addenda" | "reviews">>(
     `SELECT n.id, n.appointment_id, n.status, n.version, n.author_name, n.author_staff_id, n.subjective, n.objective, n.assessment, n.plan,
             n.interventions, n.patient_response, n.signed_at, n.created_at, n.updated_at, a.starts_at visit_at, s.name service, b.timezone
        FROM clinical_note n JOIN appointment a ON a.id=n.appointment_id JOIN service s ON s.id=a.service_id JOIN branch b ON b.id=a.branch_id
@@ -55,7 +64,9 @@ async function notesWithAddenda(where: string, params: unknown[]): Promise<NoteV
   if (!notes.length) return [];
   const add = await q<{ id: string; note_id: string; author_name: string; body: string; created_at: Date }>(
     `SELECT id, note_id, author_name, body, created_at FROM clinical_note_addendum WHERE note_id = ANY($1::uuid[]) ORDER BY created_at`, [notes.map((n) => n.id)]);
-  return notes.map((n) => ({ ...n, addenda: add.filter((x) => x.note_id === n.id) }));
+  const rev = await q<NoteView["reviews"][number] & { note_id: string }>(
+    `SELECT id, note_id, reviewer_name, reviewer_staff_id, comment, created_at FROM clinical_note_review WHERE note_id = ANY($1::uuid[]) ORDER BY created_at`, [notes.map((n) => n.id)]);
+  return notes.map((n) => ({ ...n, addenda: add.filter((x) => x.note_id === n.id), reviews: rev.filter((x) => x.note_id === n.id) }));
 }
 
 export interface GoalView {
@@ -90,6 +101,7 @@ export async function getEpisode(actor: StaffActor, episodeId: string) {
   const e = await q1<{ patient_id: string }>(`SELECT patient_id FROM care_episode WHERE id=$1 AND organization_id=$2`, [episodeId, actor.organizationId]);
   if (!e) throw new DomainError("NOT_FOUND", "Episode not found.");
   const { patient, therapistId } = await assertCareTeam(actor, e.patient_id, "CLINICAL_NOTES_READ");
+  await logView(actor, "clinical.episode.view", patient.id, { episodeId });
   const [episode, plan, goals, measurements, notes, visits] = await Promise.all([
     q1<EpisodeSummary & { discharge_summary: string | null; legacy_summary: string | null; legacy_reviewed_by: string | null }>(
       `${EPISODE_SUMMARY_SQL.replace("SELECT e.id,", "SELECT e.discharge_summary, e.legacy_summary, e.legacy_reviewed_by, e.id,")} WHERE e.id=$1`, [episodeId]),
@@ -104,6 +116,8 @@ export async function getEpisode(actor: StaffActor, episodeId: string) {
   return {
     patient, episode: episode!, plan, goals, series: buildSeries(measurements), notes, visits,
     canWrite: actor.permissions.has("CLINICAL_NOTES_WRITE") && !!therapistId,
+    canReview: actor.permissions.has("CLINICAL_RECORDS_ALL"),
+    myStaffId: actor.staffId,
     attendance: {
       completed: visits.filter((v) => v.status === "COMPLETED").length,
       missed: visits.filter((v) => v.status === "NO_SHOW").length,
@@ -126,6 +140,7 @@ export async function getTreatmentPanel(actor: StaffActor, appointmentId: string
     `SELECT id, patient_id, therapist_id, status, episode_id, starts_at FROM appointment WHERE id=$1 AND organization_id=$2`, [appointmentId, actor.organizationId]);
   if (!appt) return null;
   try { await assertCareTeam(actor, appt.patient_id, "CLINICAL_NOTES_READ"); } catch { return null; }
+  await logView(actor, "clinical.visit.view", appt.patient_id, { appointmentId: appt.id });
 
   const openEpisodes = await q<EpisodeSummary>(`${EPISODE_SUMMARY_SQL} WHERE e.patient_id=$1 AND (e.status='OPEN' OR e.id=$2) ORDER BY e.opened_on DESC`,
     [appt.patient_id, appt.episode_id]);
@@ -156,6 +171,7 @@ export async function getTreatmentPanel(actor: StaffActor, appointmentId: string
     visitNumber,
     canWrite: isAssigned && actor.permissions.has("CLINICAL_NOTES_WRITE"),
     canFile: actor.permissions.has("CLINICAL_NOTES_WRITE"),
+    canReview: actor.permissions.has("CLINICAL_RECORDS_ALL"),
     isAssigned,
     myStaffId: actor.staffId,
   };
