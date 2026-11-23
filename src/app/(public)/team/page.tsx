@@ -8,7 +8,7 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { pageOpenGraph } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Our Team", description: "Physiotherapists at the clinic.", alternates: { canonical: "/team" }, openGraph: pageOpenGraph("/team") };
+export const metadata: Metadata = { title: "Our Team — physiotherapists in HSR Layout", description: "Meet the physiotherapists at Physio Central, HSR Layout, Bengaluru, and clinical lead Dr Nitin Sunku, consultant orthopaedic and sports-medicine surgeon.", alternates: { canonical: "/team" }, openGraph: pageOpenGraph("/team") };
 
 export default async function TeamPage() {
   const team = await getPublicTherapists();

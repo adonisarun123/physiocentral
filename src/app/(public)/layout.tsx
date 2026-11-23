@@ -52,7 +52,7 @@ export default async function PublicLayout({ children }: { children: React.React
           <div className="flex items-center gap-2">
             <NavDrawer items={NAV} phone={phone ? (telHref(phone) ?? null) : null} phoneLabel={phone ? displayPhone(phone) : null} header={<Logo name={name} size={38} />} />
             <Link href="/" className="no-underline" aria-label={`${name} home`}><Logo name={name} /></Link>
-            <Link href="/contact#visit" className="location-pill state ml-3 hidden 2xl:inline-flex whitespace-nowrap">
+            <Link href="/physiotherapy-hsr-layout" className="location-pill state ml-3 hidden 2xl:inline-flex whitespace-nowrap">
               <MapPin size={16} aria-hidden="true" /> {area} <ChevronDown size={16} aria-hidden="true" />
             </Link>
           </div>
@@ -98,6 +98,8 @@ export default async function PublicLayout({ children }: { children: React.React
             <p className="title-small text-white">Quick links</p>
             <ul className="mt-4 space-y-3">
               {NAV.map((n) => <li key={n.href}><Link href={n.href} className="muted no-underline hover:text-white hover:underline">{n.label}</Link></li>)}
+              <li><Link href="/conditions" className="muted no-underline hover:text-white hover:underline">Conditions we treat</Link></li>
+              <li><Link href="/physiotherapy-hsr-layout" className="muted no-underline hover:text-white hover:underline">Physiotherapy in HSR Layout</Link></li>
               <li><Link href="/book" className="muted no-underline hover:text-white hover:underline">Book online</Link></li>
               <li><a href={ORTHO.url} target="_blank" rel="noopener" className="muted no-underline hover:text-white hover:underline">Orthopaedic consultation ↗</a></li>
             </ul>

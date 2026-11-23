@@ -10,8 +10,8 @@ import { pageOpenGraph } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
-  title: "Services",
-  description: "Physiotherapy services offered by the clinic, with session length and fees or fee policy.",
+  title: "Physiotherapy services in HSR Layout",
+  description: "Physiotherapy services at Physio Central, HSR Layout, Bengaluru: assessment, orthopaedic and sports rehab, spine care, post-surgery rehab and home visits, with session length and fees.",
   alternates: { canonical: "/services" },
   openGraph: pageOpenGraph("/services"),
 };

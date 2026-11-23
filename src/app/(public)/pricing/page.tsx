@@ -10,7 +10,7 @@ import {
 } from "@/content/pricing";
 
 export const metadata: Metadata = {
-  title: "Pricing",
+  title: "Physiotherapy fees in HSR Layout",
   description: "Physiotherapy fees at Physio Central: consultation ₹400, single session ₹800, 7-, 10- and 30-day treatment packages, dry needling, cupping and sports massage.",
   alternates: { canonical: "/pricing" },
   openGraph: pageOpenGraph("/pricing"),
