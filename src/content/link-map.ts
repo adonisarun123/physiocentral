@@ -95,10 +95,13 @@ const FEES: LinkRecord = { to: "/pricing", anchor: "Fees and treatment packages"
 /** Source page → contextual links (beyond the service relations above). */
 export const LINK_MAP: Record<string, LinkRecord[]> = {
   [svc("initial-physiotherapy-assessment")]: [
+    { to: post("first-physiotherapy-appointment-what-to-expect"), why: "Explains what happens at the assessment this page offers; the guide links back here.", approved: true },
     { to: post("lower-back-pain-when-to-see-a-physio"), why: "Explains when a problem is worth an assessment.", approved: true },
     FEES,
   ],
   [svc("orthopaedic-physiotherapy")]: [
+    { to: post("knee-osteoarthritis-exercise-and-physiotherapy"), why: "Arthritis is a listed reason to come; the guide links back here.", approved: true },
+    { to: post("plantar-fasciitis-heel-pain"), why: "Heel pain is treated under this service; the guide links back here.", approved: true },
     { to: post("frozen-shoulder-stages-and-treatment"), why: "Shoulder pain and stiffness is a listed reason to come; the guide links back here.", approved: true },
     FEES,
   ],
@@ -108,19 +111,27 @@ export const LINK_MAP: Record<string, LinkRecord[]> = {
     FEES,
   ],
   [svc("sports-injury-rehabilitation")]: [
+    { to: post("common-running-injuries-hsr-layout-runners"), why: "Running injuries are treated here; the guide links back here.", approved: true },
+    { to: post("sprained-ankle-rehab"), why: "Ligament injuries are a listed reason to come; the guide links back here.", approved: true },
     { to: post("acl-reconstruction-recovery-timeline"), why: "ACL injury is a listed reason to come.", approved: true },
     FEES,
   ],
   [svc("spine-and-posture-care")]: [
+    { to: post("desk-job-neck-and-back-pain-hsr-layout"), why: "Posture-related neck and back pain is what this service treats; the guide links back here.", approved: true },
+    { to: post("sciatica-symptoms-and-physiotherapy"), why: "Sciatica is treated here; the guide links back here.", approved: true },
     { to: post("lower-back-pain-when-to-see-a-physio"), why: "Lower back pain is the first listed reason to come; the guide links back here.", approved: true },
     FEES,
   ],
-  [svc("strengthening-and-functional-training")]: [FEES],
+  [svc("strengthening-and-functional-training")]: [
+    { to: post("knee-osteoarthritis-exercise-and-physiotherapy"), why: "The guide makes strengthening the first treatment for knee arthritis.", approved: true },
+    FEES,
+  ],
   [svc("pain-management-and-manual-therapy")]: [
     { to: post("lower-back-pain-when-to-see-a-physio"), why: "The guide describes hands-on care to settle back pain.", approved: true },
     FEES,
   ],
   [svc("home-visits")]: [
+    { to: post("home-physiotherapy-for-elderly-parents"), why: "Explains home visits for older adults; the guide links back here.", approved: true },
     { to: post("physiotherapy-after-knee-replacement"), why: "The guide tells readers home visits are available in the first weeks.", approved: true },
     FEES,
   ],
@@ -136,6 +147,34 @@ export const LINK_MAP: Record<string, LinkRecord[]> = {
     { to: svc("pain-management-and-manual-therapy"), anchor: "Pain management and manual therapy", why: "The guide mentions hands-on care to settle pain.", approved: true },
   ],
   [post("frozen-shoulder-stages-and-treatment")]: [],
+
+  // Guides added 2026-11-23 (local + condition guides). Added by Arun Mahendran; guides approved by Dr Sunku (relayed 2026-11-23).
+  [post("desk-job-neck-and-back-pain-hsr-layout")]: [
+    { to: svc("pain-management-and-manual-therapy"), anchor: "Pain management and manual therapy", why: "The guide describes treating stiff joints and tight muscles.", approved: true },
+  ],
+  [post("sciatica-symptoms-and-physiotherapy")]: [
+    { to: svc("pain-management-and-manual-therapy"), anchor: "Pain management and manual therapy", why: "The guide covers settling leg and back pain first.", approved: true },
+  ],
+  [post("common-running-injuries-hsr-layout-runners")]: [
+    { to: svc("strengthening-and-functional-training"), anchor: "Strengthening and functional training", why: "The guide recommends strength training twice a week.", approved: true },
+  ],
+  [post("plantar-fasciitis-heel-pain")]: [
+    { to: svc("sports-injury-rehabilitation"), anchor: "Sports injury rehabilitation", why: "The guide names runners as commonly affected.", approved: true },
+  ],
+  [post("sprained-ankle-rehab")]: [
+    { to: svc("strengthening-and-functional-training"), anchor: "Strengthening and functional training", why: "Strength and balance stages are this service's work.", approved: true },
+  ],
+  [post("knee-osteoarthritis-exercise-and-physiotherapy")]: [
+    { to: svc("strengthening-and-functional-training"), anchor: "Strengthening and functional training", why: "The guide's programme is strengthening.", approved: true },
+  ],
+  [post("first-physiotherapy-appointment-what-to-expect")]: [FEES],
+  [post("choosing-a-physiotherapist-in-hsr-layout")]: [
+    { to: svc("initial-physiotherapy-assessment"), anchor: "Initial physiotherapy assessment", why: "The guide says every new problem starts with an assessment.", approved: true },
+  ],
+  [post("home-physiotherapy-for-elderly-parents")]: [
+    { to: svc("post-surgical-rehabilitation"), anchor: "Post-surgical rehabilitation", why: "The guide lists the weeks after joint replacement or fracture surgery.", approved: true },
+    { to: svc("strengthening-and-functional-training"), anchor: "Strengthening and functional training", why: "Strength and balance exercises are the core of the guide.", approved: true },
+  ],
 
   "/pricing": [
     { to: "/services", anchor: "what each service involves", why: "Price tables name treatments without explaining them.", approved: true },

@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { Markdown, headings } from "@/components/site/markdown";
 import { POSTS } from "@/content/blog/posts";
 import { POLICIES } from "@/content/policies";
+import { SERVICES } from "../../scripts/content/services";
 
 describe("Markdown renderer", () => {
   it("renders headings, lists, bold and links", () => {
@@ -27,7 +28,15 @@ describe("content", () => {
     expect(new Set(slugs).size).toBe(slugs.length);
     const all = [...POSTS.map((p) => p.body), ...Object.values(POLICIES).map((p) => p.body)].join("\n");
     const internal = [...all.matchAll(/\]\((\/[^)]*)\)/g)].map((m) => m[1].split("#")[0]);
-    const known = /^\/(book|contact|cancellation-refunds|privacy|terms|accessibility|blog(\/.*)?|services\/(post-surgical-rehabilitation|home-visits|spine-and-posture-care|orthopaedic-physiotherapy))$/;
-    for (const l of internal) expect(l).toMatch(known);
+    const known = /^\/(book|contact|cancellation-refunds|privacy|terms|accessibility|pricing|team|services|blog)$/;
+    const services = new Set(SERVICES.map((s) => s.slug));
+    const posts = new Set(slugs);
+    for (const l of internal) {
+      const svc = /^\/services\/([a-z0-9-]+)$/.exec(l);
+      const post = /^\/blog\/([a-z0-9-]+)$/.exec(l);
+      if (svc) expect(services.has(svc[1]), l).toBe(true);
+      else if (post) expect(posts.has(post[1]), l).toBe(true);
+      else expect(l).toMatch(known);
+    }
   });
 });

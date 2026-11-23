@@ -3,10 +3,12 @@ import { LINK_MAP, SERVICE_RELATIONS, bodyLinkPaths, isContentPath, linksFor, re
 import { POSTS } from "@/content/blog/posts";
 import { isRelatedToProp, relatedLinkProp } from "@/modules/content/schema";
 import { SERVICES } from "../../scripts/content/services";
+import { CONDITION_GROUPS } from "@/content/conditions";
+import { AREAS } from "@/content/areas";
 
 const serviceSlugs = new Set(SERVICES.map((s) => s.slug));
 const postSlugs = new Set(POSTS.map((p) => p.slug));
-const STATIC = new Set(["/services", "/pricing", "/team", "/about", "/blog", "/contact"]);
+const STATIC = new Set(["/services", "/pricing", "/team", "/about", "/blog", "/contact", "/conditions", "/physiotherapy-hsr-layout"]);
 
 /** A path is valid when it is a published static page, a seeded service or an existing post. */
 function resolves(path: string): boolean {
@@ -68,6 +70,27 @@ describe("editorial link map", () => {
     } finally {
       rel.approved = true;
     }
+  });
+
+  it("conditions hub points at real services and guides", () => {
+    for (const g of CONDITION_GROUPS) for (const c of g.conditions) {
+      expect(serviceSlugs.has(c.service), `${c.name} -> ${c.service}`).toBe(true);
+      if (c.guide) expect(postSlugs.has(c.guide), `${c.name} -> ${c.guide}`).toBe(true);
+    }
+  });
+
+  it("area pages have unique slugs, their own copy, and links that resolve", () => {
+    expect(new Set(AREAS.map((a) => a.slug)).size).toBe(AREAS.length);
+    expect(new Set(AREAS.map((a) => a.intro)).size, "each area needs its own intro").toBe(AREAS.length);
+    for (const a of AREAS) {
+      expect(a.slug).toMatch(/^[a-z0-9-]+$/);
+      for (const p of a.commonProblems) expect(resolves(p.href) || p.href === "/conditions", `${a.slug} -> ${p.href}`).toBe(true);
+    }
+  });
+
+  it("post slugs are unique and every post date is valid", () => {
+    expect(new Set(POSTS.map((p) => p.slug)).size).toBe(POSTS.length);
+    for (const p of POSTS) expect(Number.isNaN(Date.parse(p.date)), p.slug).toBe(false);
   });
 
   it("only content pages qualify for relatedLink", () => {

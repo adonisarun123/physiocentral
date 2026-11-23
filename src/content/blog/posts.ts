@@ -6,11 +6,13 @@
  * Clinical content: set `reviewedBy` only once the named clinician has actually
  * reviewed the text — the "Medically reviewed by" line renders only when set.
  */
+import { LOCAL_POSTS } from "./posts-local";
+
 export interface Post {
   slug: string;
   title: string;
   description: string; // ~150 chars, used for meta description and cards
-  category: "Sports injuries" | "Post-surgery rehab" | "Back & neck" | "Joint pain";
+  category: "Sports injuries" | "Post-surgery rehab" | "Back & neck" | "Joint pain" | "Foot & ankle" | "Patient guides";
   date: string; // YYYY-MM-DD
   updated?: string;
   image: string; // under /public
@@ -21,7 +23,7 @@ export interface Post {
   body: string;
 }
 
-export const POSTS: Post[] = [
+const CORE_POSTS: Post[] = [
   {
     slug: "acl-reconstruction-recovery-timeline",
     title: "ACL reconstruction recovery: a phase-by-phase rehab guide",
@@ -238,6 +240,8 @@ If pain is severe or progress stalls, an orthopaedic specialist may discuss opti
 `,
   },
 ];
+
+export const POSTS: Post[] = [...CORE_POSTS, ...LOCAL_POSTS];
 
 export function readingMinutes(body: string) {
   return Math.max(2, Math.round(body.split(/\s+/).length / 220));
