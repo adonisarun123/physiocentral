@@ -44,7 +44,9 @@ export default async function ExerciseSheetPage({ params }: { params: Promise<{ 
         ))}
       </ol>
       {h.advice ? <section className="mt-4"><h2 className="font-bold">Advice</h2><p className="whitespace-pre-line">{h.advice}</p></section> : null}
-      <p className="mt-6 text-sm">If an exercise causes pain that doesn&apos;t settle, stop it and contact the clinic{h.clinic.phone ? ` on ${displayPhone(h.clinic.phone)}` : ""}.</p>
+      {/* Wording approved by Dr Nitin N Sunku (clinic head), Nov 2026: shown on every sheet in his name. */}
+      <p className="mt-6 text-sm">If an exercise causes pain that doesn&apos;t settle, stop it and contact the clinic{h.clinic.phone ? ` on ${displayPhone(h.clinic.phone)}` : ""}.
+        <span className="mt-1 block font-semibold">— Dr Nitin N Sunku</span></p>
     </article>
   );
 }
