@@ -1,9 +1,9 @@
 import { SEX_OPTIONS } from "@/modules/patients/admin";
 
-/** Age / sex / address / diagnosis / treatment protocol — used on registration and on the patient record. */
+/** Age / sex / address — used on registration and on the patient record. Clinical detail lives in the chart. */
 export function PatientProfileFields({ idPrefix, values = {}, compact = false }: {
   idPrefix: string;
-  values?: { age?: number | null; sex?: string | null; address?: string | null; diagnosis?: string | null; treatmentProtocol?: string | null };
+  values?: { age?: number | null; sex?: string | null; address?: string | null };
   compact?: boolean;
 }) {
   const id = (k: string) => `${idPrefix}-${k}`;
@@ -20,10 +20,6 @@ export function PatientProfileFields({ idPrefix, values = {}, compact = false }:
       </div>
       <div><label className="field-label" htmlFor={id("address")}>Address</label>
         <textarea id={id("address")} name="address" rows={2} maxLength={500} defaultValue={values.address ?? ""} className="input" /></div>
-      <div><label className="field-label" htmlFor={id("diagnosis")}>Diagnosis</label>
-        <textarea id={id("diagnosis")} name="diagnosis" rows={compact ? 2 : 3} maxLength={2000} defaultValue={values.diagnosis ?? ""} className="input" placeholder="e.g. Right knee OA, grade 2" /></div>
-      <div><label className="field-label" htmlFor={id("tp")}>Treatment protocol</label>
-        <textarea id={id("tp")} name="treatmentProtocol" rows={compact ? 2 : 3} maxLength={4000} defaultValue={values.treatmentProtocol ?? ""} className="input" placeholder="e.g. IFT + ultrasound, quads strengthening, 10 sessions" /></div>
     </div>
   );
 }

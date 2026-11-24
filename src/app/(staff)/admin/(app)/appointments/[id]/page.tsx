@@ -14,6 +14,8 @@ import {
   offlineDecisionAction, removeEstimateLineAction, reviseEstimateAction, sendEstimateAction, transitionAction, attachRequestToPatientAction,
 } from "../../../actions";
 import { existingPatientMatches } from "@/modules/patients/admin";
+import { getTreatmentPanel } from "@/modules/clinical/read";
+import { TreatmentSection } from "@/components/clinical/treatment-section";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Appointment" };
@@ -65,6 +67,7 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
     q<{ id: string; number: string; amount_paise: string; approved_by_name: string; refunded_on: string }>(
       `SELECT id, number, amount_paise, approved_by_name, to_char(refunded_on,'DD Mon YYYY') refunded_on FROM payment_refund WHERE appointment_id=$1 ORDER BY created_at`, [id]),
   ]);
+  const treatment = await getTreatmentPanel(actor, a.id);
   const paidTotal = paid.reduce((s, x) => s + BigInt(x.amount_paise) - BigInt(x.refunded), 0n);
   const sameMobile = a.status === "REQUESTED" && can(actor, "APPOINTMENT_ACCEPT") && can(actor, "PATIENT_CONTACT_VIEW")
     ? await existingPatientMatches(actor.organizationId, [a.patient_id]) : [];
@@ -93,6 +96,7 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
       <p className="mb-4 text-sm text-[var(--color-ink-muted)]">Version {a.version}. If someone else changes this appointment, your next action is refused and you&apos;ll be asked to reload.</p>
 
       <div className="grid gap-6 xl:grid-cols-2">
+        {treatment ? <TreatmentSection p={treatment} patientId={a.patient_id} myName={actor.displayName} /> : null}
         <section className="card" aria-labelledby="details-h">
           <h2 id="details-h" className="text-lg font-bold">Details</h2>
           <dl className="mt-2 space-y-1">
@@ -271,7 +275,6 @@ export default async function AppointmentPage({ params }: { params: Promise<{ id
               <li key={i.id}><Link href={`/admin/invoices/${i.id}`}>{i.number ?? "Draft invoice"}</Link> <StatusBadge status={i.status} /> {formatINR(i.total_paise)}</li>
             ))}</ul>
           ) : null}
-          <div className="mt-4"><Notice>Clinical notes and intake are not part of this release; record clinical information in your existing clinical system.</Notice></div>
         </section>
       </div>
     </>

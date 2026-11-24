@@ -15,6 +15,8 @@ import { PatientProfileFields } from "@/components/admin/patient-profile-fields"
 import { PackageProgress } from "@/components/admin/package-progress";
 import { CURRENT_AGE_SQL, sexLabel } from "@/modules/patients/admin";
 import { listPackages } from "@/modules/scheduling/packages";
+import { canOpenChart } from "@/modules/clinical/access";
+import { IntakeForm } from "@/components/clinical/parts";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Patient" };
@@ -24,11 +26,12 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(id)) notFound();
   const p = await q1<{ id: string; public_ref: string; op_number: number | null; full_name: string; created_at: Date; age: number | null; sex: string | null;
-    address: string | null; diagnosis: string | null; treatment_protocol: string | null }>(
-    `SELECT p.id, p.public_ref, p.op_number, p.full_name, p.created_at, ${CURRENT_AGE_SQL} age, p.sex, p.address, p.diagnosis, p.treatment_protocol
+    address: string | null }>(
+    // Operational view only: diagnosis / protocol are clinical and shown in the chart (feature #10).
+    `SELECT p.id, p.public_ref, p.op_number, p.full_name, p.created_at, ${CURRENT_AGE_SQL} age, p.sex, p.address
        FROM patient p WHERE p.id=$1 AND p.organization_id=$2`, [id, actor.organizationId]);
   if (!p) notFound();
-  const [contacts, visits, invoices, payments, packages] = await Promise.all([
+  const [contacts, visits, invoices, payments, packages, chartAccess, intakes] = await Promise.all([
     q<{ kind: string; value: string }>(`SELECT kind, value FROM patient_contact WHERE patient_id=$1 ORDER BY preferred DESC, created_at`, [id]),
     q<{ id: string; public_ref: string; starts_at: Date; status: string; service: string; therapist: string | null; source: string; package_name: string | null }>(
       `SELECT a.id, a.public_ref, a.starts_at, a.status, s.name service, t.display_name therapist, a.source,
@@ -41,6 +44,9 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
       `SELECT pm.id, pm.amount_paise, pm.method, pm.status, to_char(pm.received_on,'YYYY-MM-DD') received_on, f.unallocated_paise::text unallocated, f.refunded_paise::text refunded, r.id receipt_id, r.number receipt_number
          FROM payment pm JOIN payment_funds f ON f.payment_id=pm.id LEFT JOIN receipt r ON r.payment_id=pm.id WHERE pm.patient_id=$1 ORDER BY pm.created_at DESC`, [id]),
     listPackages(actor.organizationId, { patientId: id }),
+    canOpenChart(actor, id),
+    // Reception sees that an intake arrived, never what it says.
+    q<{ created_at: Date }>(`SELECT created_at FROM intake_submission WHERE patient_id=$1 ORDER BY created_at DESC`, [id]),
   ]);
   const phone = contacts.find((c) => c.kind === "PHONE")?.value ?? "";
   const email = contacts.find((c) => c.kind === "EMAIL")?.value ?? "";
@@ -56,18 +62,19 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         {can(actor, "APPOINTMENT_ACCEPT") ? <Link href={`/admin/book?patient=${p.id}`} className="btn btn-primary">Book appointment</Link> : null}
         {can(actor, "APPOINTMENT_ACCEPT") ? <Link href={`/admin/book?patient=${p.id}&mode=package`} className="btn btn-secondary">Book package</Link> : null}
         {can(actor, "INVOICE_DRAFT") ? <Link href={`/admin/invoices/new?patient=${p.id}`} className="btn btn-secondary">New invoice</Link> : null}
+        {chartAccess ? <Link href={`/admin/chart/${p.id}`} className="btn btn-secondary">Clinical record</Link> : null}
       </PageHeader>
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         <div className="card"><p className="text-sm text-[var(--color-ink-muted)]">Amount due</p><p className="text-2xl font-bold">{formatINR(due)}</p></div>
         <div className="card"><p className="text-sm text-[var(--color-ink-muted)]">Unapplied credit</p><p className="text-2xl font-bold">{formatINR(credit)}</p></div>
         <div className="card"><p className="text-sm text-[var(--color-ink-muted)]">Visits</p><p className="text-xl font-bold">{visits.filter((v) => v.status === "COMPLETED").length} completed · {visits.filter((v) => v.status === "CONFIRMED" && new Date(v.starts_at) > new Date()).length} upcoming</p></div>
       </div>
-      {p.diagnosis || p.treatment_protocol ? (
-        <section className="card mb-6 grid gap-4 sm:grid-cols-2">
-          <div><h2 className="text-sm font-semibold text-[var(--color-ink-muted)]">Diagnosis</h2><p className="mt-1 whitespace-pre-line">{p.diagnosis || "—"}</p></div>
-          <div><h2 className="text-sm font-semibold text-[var(--color-ink-muted)]">Treatment protocol</h2><p className="mt-1 whitespace-pre-line">{p.treatment_protocol || "—"}</p></div>
-        </section>
-      ) : null}
+      <section className="card mb-6" aria-labelledby="intake-h">
+        <h2 id="intake-h" className="text-lg font-bold">Intake</h2>
+        <p className="text-sm text-[var(--color-ink-muted)]">{intakes.length ? `${intakes.length} intake form${intakes.length === 1 ? "" : "s"} on file, latest ${formatDateTime(intakes[0].created_at)}. The physiotherapist reads them in the clinical record.` : "No intake form yet."}</p>
+        <details className="mt-2"><summary className="cursor-pointer font-semibold">Complete intake at reception</summary>
+          <div className="mt-2"><IntakeForm ctx={{ patientId: p.id }} idPrefix="rin" /></div></details>
+      </section>
       {packages.length ? (
         <section className="card mb-6">
           <h2 className="text-lg font-bold">Packages</h2>
@@ -121,7 +128,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
               <div><label className="field-label" htmlFor="pp">Mobile</label><input id="pp" name="phone" defaultValue={phone} required className="input" /></div>
               <div><label className="field-label" htmlFor="pe">Email</label><input id="pe" name="email" type="email" defaultValue={email} className="input" /></div>
             </div>
-            <PatientProfileFields idPrefix="pd" values={{ age: p.age, sex: p.sex, address: p.address, diagnosis: p.diagnosis, treatmentProtocol: p.treatment_protocol }} />
+            <PatientProfileFields idPrefix="pd" values={{ age: p.age, sex: p.sex, address: p.address }} />
             <div><SubmitButton small>Save</SubmitButton></div>
           </ActionForm>
         </section>

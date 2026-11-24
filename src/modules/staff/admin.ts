@@ -21,7 +21,15 @@ export const ROLE_LABELS: Record<Role, { label: string; help: string }> = {
   BILLING: { label: "Billing", help: "Issue invoices, verify and apply payments" },
   ACCOUNTANT: { label: "Accountant", help: "Read finances, tax set-up, prices, audit log" },
   CONTENT_EDITOR: { label: "Website editor", help: "Service descriptions only" },
+  CLINICAL_LEAD: { label: "Clinical lead", help: "Every patient's clinical record, countersigning notes, clinical overview and audit history. Needs a linked physiotherapist profile" },
 };
+
+/** Clinical lead opens every clinical record, so it is for a clinician only: the login must be linked to a physiotherapist profile. */
+async function guardClinicalLead(db: Db, staffId: string, roles: string[]) {
+  if (!roles.includes("CLINICAL_LEAD")) return;
+  const t = await q1<{ id: string }>(`SELECT id FROM therapist WHERE staff_member_id=$1 AND active`, [staffId], db);
+  if (!t) throw new DomainError("VALIDATION", "Clinical lead can only be given to a login linked to an active physiotherapist profile.", { therapistId: "Required for clinical lead" });
+}
 
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789";
 export function tempPassword() {
@@ -78,6 +86,7 @@ export async function createStaffLogin(
         [actor.organizationId, user.id, name], db))!;
       for (const r of roles) await q(`INSERT INTO role_grant (organization_id, staff_member_id, role, granted_by) VALUES ($1,$2,$3,$4)`, [actor.organizationId, s.id, r, actor.label], db);
       if (input.therapistId) await linkTherapist(db, actor, s.id, input.therapistId);
+      await guardClinicalLead(db, s.id, roles);
       await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "staff.create", targetType: "staff_member", targetId: s.id, changes: { email, roles }, correlationId });
       return { staffId: s.id, email, tempPassword: password };
     });
@@ -123,6 +132,7 @@ export async function updateStaff(
     await q(`DELETE FROM role_grant WHERE staff_member_id=$1`, [s.id], db);
     for (const r of roles) await q(`INSERT INTO role_grant (organization_id, staff_member_id, role, granted_by) VALUES ($1,$2,$3,$4)`, [actor.organizationId, s.id, r, actor.label], db);
     if (input.therapistId !== undefined) await linkTherapist(db, actor, s.id, input.therapistId);
+    await guardClinicalLead(db, s.id, roles);
     await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "staff.update", targetType: "staff_member", targetId: s.id, changes: { roles: [s.roles, roles] }, correlationId });
   });
 }

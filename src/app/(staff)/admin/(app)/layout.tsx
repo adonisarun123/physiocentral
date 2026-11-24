@@ -17,6 +17,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/calendar", label: "Calendar", show: can(actor, "APPOINTMENT_VIEW") },
     { href: "/admin/book", label: "+ New booking", show: can(actor, "APPOINTMENT_ACCEPT") },
     { href: "/admin/patients", label: "Patients", show: can(actor, "PATIENT_CONTACT_VIEW") },
+    { href: "/admin/clinical", label: "Clinical overview", show: can(actor, "CLINICAL_RECORDS_ALL") },
     { href: "/admin/packages", label: "Packages", show: can(actor, "APPOINTMENT_VIEW") },
     { href: "/admin/invoices", label: "Invoices", show: can(actor, "INVOICE_DRAFT") || can(actor, "FINANCE_VIEW") },
     { href: "/admin/payments", label: "Payments", show: can(actor, "PAYMENT_RECORD") || can(actor, "PAYMENT_VERIFY") },
@@ -24,6 +25,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     { href: "/admin/team", label: "Physiotherapists", show: can(actor, "SETTINGS_MANAGE") },
     { href: "/admin/schedule", label: "Hours & holidays", show: can(actor, "SETTINGS_MANAGE") },
     { href: "/admin/staff", label: "Staff & logins", show: can(actor, "USERS_MANAGE") },
+    { href: "/admin/audit", label: "Audit history", show: can(actor, "AUDIT_VIEW") },
     { href: "/admin/security", label: "My security", show: true },
   ].filter((n) => n.show);
 
