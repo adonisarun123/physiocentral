@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: "Packages" };
 
 const VIEWS = [
   { key: "active", label: "Running" },
-  { key: "finished", label: "Finished / closed" },
+  { key: "finished", label: "Finished / expired / closed" },
   { key: "all", label: "All" },
 ] as const;
 
@@ -53,8 +53,8 @@ export default async function PackagesPage({ searchParams }: { searchParams: Pro
                 <tr key={k.id}>
                   <td>{showContact ? <Link href={`/admin/patients/${k.patient_id}`} className="font-semibold">{k.patient}</Link> : <span className="font-semibold">{k.patient}</span>}
                     <span className="block text-xs text-[var(--color-ink-muted)]">{k.patient_ref}{showContact && k.phone ? ` · ${displayPhone(k.phone)}` : ""}</span></td>
-                  <td><Link href={`/admin/packages/${k.id}`} className="font-semibold">{k.name}</Link><span className="block font-mono text-xs">{k.public_ref}{k.status === "CLOSED" ? " · closed" : ""}</span></td>
-                  <td><PackageProgress total={k.sessions_total} done={k.done} booked={k.upcoming} missed={k.no_show} /></td>
+                  <td><Link href={`/admin/packages/${k.id}`} className="font-semibold">{k.name}</Link><span className="block font-mono text-xs">{k.public_ref}{k.status === "CLOSED" ? " · closed" : k.expired ? " · expired" : ""}</span></td>
+                  <td><PackageProgress total={k.sessions_total} done={k.done} booked={k.upcoming} missed={k.no_show} validUntil={k.valid_until} expired={k.expired} /></td>
                   <td>{k.next_at ? formatDateTime(k.next_at) : "—"}</td>
                   <td className="text-sm">{k.first_at ? `${formatDate(k.first_at)} → ${formatDate(k.last_at!)}` : "—"}</td>
                 </tr>

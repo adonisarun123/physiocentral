@@ -331,13 +331,18 @@ export async function packageBookAction(_: ActionResult, fd: FormData): Promise<
     const r = await createPackageBooking(a, {
       patientId: s(fd, "patientId"), serviceId: s(fd, "serviceId"), therapistId: s(fd, "therapistId") || null,
       startsAt: s(fd, "startsAt"), source: s(fd, "source") === "WALK_IN" ? "WALK_IN" : "PHONE", reason: s(fd, "reason"),
-      name, sessions, pricePaise: price,
+      name, sessions, pricePaise: price, validDays: s(fd, "validDays") ? n(fd, "validDays") : defaultValidDays(sessions),
     }, cid);
     id = r.packageId;
     note = r.booked < r.sessions ? `&short=${r.sessions - r.booked}` : "";
   }, ["/admin", "/admin/calendar", "/admin/packages", `/admin/patients/${s(fd, "patientId")}`]);
   if (res?.ok && id) redirect(`/admin/packages/${id}?booked=1${note}`);
   return res;
+}
+
+/** Default package validity when staff leave it blank: twice the sessions, at least a week. */
+function defaultValidDays(sessions: number) {
+  return Number.isFinite(sessions) && sessions > 0 ? Math.min(365, Math.max(7, sessions * 2)) : null;
 }
 
 export async function packageStatusAction(_: ActionResult, fd: FormData) {

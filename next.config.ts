@@ -45,9 +45,17 @@ const nextConfig = (phase: string): NextConfig => {
     return [{ source: "/locations/:slug", destination: "/contact#visit", permanent: true }];
   },
   async headers() {
+    const baseSecurity = [
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      { key: "X-Frame-Options", value: "DENY" },
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+    ];
     return [
       {
-        source: "/:path*",
+        // Everything except stored patient files, which set their own policy per
+        // file type in the route (a config header would override it).
+        source: "/((?!admin/documents/).*)",
         headers: [
           { key: "Content-Security-Policy", value: csp },
           { key: "X-Content-Type-Options", value: "nosniff" },
@@ -58,6 +66,7 @@ const nextConfig = (phase: string): NextConfig => {
           { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
         ],
       },
+      { source: "/admin/documents/:path*", headers: baseSecurity },
       {
         source: "/(admin|manage|api)/:path*",
         headers: [

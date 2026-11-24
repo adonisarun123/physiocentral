@@ -14,38 +14,48 @@ export interface PackageRow {
   /** OP number as shown to staff ("OP-0027"), or the internal ref when the patient has none yet. */
   patient_ref: string;
   phone: string | null;
-  /** Visits completed. */
+  /** Sessions used up: checked in, in progress or completed (deducted at check-in). */
   done: number;
-  /** Booked, not yet completed (confirmed / checked in / in progress). */
+  /** Booked, not yet checked in. */
   upcoming: number;
   /** Missed visits — they still use up a place in the package. */
   no_show: number;
   first_at: Date | null;
   last_at: Date | null;
   next_at: Date | null;
+  /** Last day the package can be used (clinic-local), or null for no expiry. */
+  valid_until: string | null;
+  /** Past its expiry date today. */
+  expired: boolean;
 }
 
 const BASE = `
   SELECT k.id, k.public_ref, k.name, k.status, k.sessions_total, k.price_paise::text, k.created_at, k.patient_id,
          p.full_name patient, COALESCE('OP-'||lpad(p.op_number::text, 4, '0'), p.public_ref) patient_ref,
          (SELECT value FROM patient_contact c WHERE c.patient_id=p.id AND c.kind='PHONE' ORDER BY preferred DESC LIMIT 1) phone,
-         count(a.id) FILTER (WHERE a.status='COMPLETED')::int done,
-         count(a.id) FILTER (WHERE a.status IN ('CONFIRMED','CHECKED_IN','IN_PROGRESS','REQUESTED','AWAITING_PATIENT_CONFIRMATION','AWAITING_DEPOSIT'))::int upcoming,
+         count(a.id) FILTER (WHERE a.status IN ('CHECKED_IN','IN_PROGRESS','COMPLETED'))::int done,
+         count(a.id) FILTER (WHERE a.status IN ('CONFIRMED','REQUESTED','AWAITING_PATIENT_CONFIRMATION','AWAITING_DEPOSIT'))::int upcoming,
          count(a.id) FILTER (WHERE a.status='NO_SHOW')::int no_show,
          min(a.starts_at) FILTER (WHERE a.status NOT IN ('CANCELLED','REJECTED')) first_at,
          max(a.starts_at) FILTER (WHERE a.status NOT IN ('CANCELLED','REJECTED')) last_at,
-         min(a.starts_at) FILTER (WHERE a.status IN ('CONFIRMED','CHECKED_IN','IN_PROGRESS') AND a.ends_at > now()) next_at
+         min(a.starts_at) FILTER (WHERE a.status IN ('CONFIRMED','CHECKED_IN','IN_PROGRESS') AND a.ends_at > now()) next_at,
+         to_char(k.valid_until,'YYYY-MM-DD') valid_until,
+         (k.valid_until IS NOT NULL AND (now() AT TIME ZONE 'Asia/Kolkata')::date > k.valid_until) expired
     FROM patient_package k
     JOIN patient p ON p.id=k.patient_id
     LEFT JOIN appointment a ON a.package_id=k.id`;
 const GROUP = ` GROUP BY k.id, p.id`;
+/** Open, sessions left, and not past expiry. */
+const ACTIVE_SQL = `k.status='ACTIVE'
+  AND count(a.id) FILTER (WHERE a.status IN ('CHECKED_IN','IN_PROGRESS','COMPLETED','NO_SHOW')) < k.sessions_total
+  AND (k.valid_until IS NULL OR (now() AT TIME ZONE 'Asia/Kolkata')::date <= k.valid_until)`;
 
 /** Packages for the organisation, newest first. `view`: active (default), finished/closed, or all. */
 export function listPackages(orgId: string, opts: { patientId?: string; view?: "active" | "finished" | "all"; term?: string } = {}) {
   const view = opts.patientId ? "all" : opts.view ?? "active";
   const having =
-    view === "active" ? ` HAVING k.status='ACTIVE' AND count(a.id) FILTER (WHERE a.status IN ('COMPLETED','NO_SHOW')) < k.sessions_total`
-    : view === "finished" ? ` HAVING NOT (k.status='ACTIVE' AND count(a.id) FILTER (WHERE a.status IN ('COMPLETED','NO_SHOW')) < k.sessions_total)`
+    view === "active" ? ` HAVING ${ACTIVE_SQL}`
+    : view === "finished" ? ` HAVING NOT (${ACTIVE_SQL})`
     : "";
   const t = (opts.term ?? "").trim();
   return q<PackageRow>(

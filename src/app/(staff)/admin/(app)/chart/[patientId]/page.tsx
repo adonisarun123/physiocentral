@@ -9,6 +9,11 @@ import { sideLabel } from "@/modules/clinical/constants";
 import { sexLabel } from "@/modules/patients/admin";
 import { IntakeForm, NewEpisodeForm } from "@/components/clinical/parts";
 import { orDeny } from "./load";
+import { documentKindLabel, listDocuments } from "@/modules/patients/documents";
+import { listHomeProgrammes } from "@/modules/clinical/exercises";
+import { DocumentUpload } from "@/components/admin/document-upload";
+import { ActionForm, SubmitButton } from "@/components/action-form";
+import { deleteDocumentAction, stopHomeProgrammeAction } from "../../../ops-actions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Clinical record", robots: { index: false, follow: false } };
@@ -19,6 +24,7 @@ export default async function ChartPage({ params }: { params: Promise<{ patientI
   const actor = await requireStaff("CLINICAL_NOTES_READ");
   const { patientId } = await params;
   const c = await orDeny(getChart(actor, patientId));
+  const [docs, programmes] = await Promise.all([listDocuments(actor, c.patient.id), listHomeProgrammes(actor, c.patient.id)]);
   const canWrite = can(actor, "CLINICAL_NOTES_WRITE");
   const open = c.episodes.filter((e) => e.status === "OPEN");
   const closed = c.episodes.filter((e) => e.status !== "OPEN");
@@ -84,6 +90,53 @@ export default async function ChartPage({ params }: { params: Promise<{ patientI
             <details className="mt-3"><summary className="cursor-pointer font-semibold">Record an intake</summary>
               <div className="mt-2"><IntakeForm ctx={ctx} episodes={open} idPrefix="chin" /></div></details>
           ) : null}
+        </section>
+
+        <section className="card" aria-labelledby="doc-h">
+          <h2 id="doc-h" className="text-lg font-bold">Scans &amp; reports</h2>
+          {docs.length === 0 ? <p className="mt-2 text-sm text-[var(--color-ink-muted)]">No documents uploaded yet.</p> : (
+            <ul className="mt-2 divide-y divide-[var(--color-line)]">{docs.map((d) => (
+              <li key={d.id} className="py-2">
+                <a href={`/admin/documents/${d.id}`} target="_blank" rel="noopener" className="font-semibold">{d.title}</a>
+                <span className="block text-sm text-[var(--color-ink-muted)]">
+                  {[documentKindLabel(d.kind), d.document_date ? day(d.document_date) : null, `${Math.max(1, Math.round(d.size_bytes / 1024))} KB ${d.mime_type === "application/pdf" ? "PDF" : "image"}`,
+                    `added ${formatDate(d.created_at)} by ${d.uploaded_by_name}`].filter(Boolean).join(" · ")}
+                  {" · "}<a href={`/admin/documents/${d.id}?download=1`}>Download</a>
+                </span>
+                {canWrite ? (
+                  <details className="mt-1"><summary className="cursor-pointer text-sm">Remove</summary>
+                    <ActionForm action={deleteDocumentAction} className="mt-2 flex flex-wrap items-end gap-2" confirm="Remove this document from the record?">
+                      <input type="hidden" name="documentId" value={d.id} /><input type="hidden" name="patientId" value={c.patient.id} />
+                      <label className="sr-only" htmlFor={`dr-${d.id}`}>Reason</label>
+                      <input id={`dr-${d.id}`} name="reason" required minLength={3} placeholder="Reason, e.g. wrong patient" className="input" />
+                      <SubmitButton small variant="danger">Remove</SubmitButton>
+                    </ActionForm></details>
+                ) : null}
+              </li>))}</ul>
+          )}
+          {can(actor, "DOCUMENT_UPLOAD") ? (
+            <details className="mt-3" open={docs.length === 0}><summary className="cursor-pointer font-semibold">Upload a scan or report</summary>
+              <div className="mt-2"><DocumentUpload patientId={c.patient.id} idPrefix="chdoc" /></div></details>
+          ) : null}
+          <p className="mt-2 text-xs text-[var(--color-ink-muted)]">Every time a document is opened, it is recorded in the audit history.</p>
+        </section>
+
+        <section className="card" aria-labelledby="hep-h">
+          <h2 id="hep-h" className="text-lg font-bold">Home exercise sheets</h2>
+          {programmes.length === 0 ? <p className="mt-2 text-sm text-[var(--color-ink-muted)]">No sheet given yet.</p> : (
+            <ul className="mt-2 divide-y divide-[var(--color-line)]">{programmes.map((h) => (
+              <li key={h.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                <span><a href={`/admin/exercise-sheets/${h.id}`} className="font-semibold">{h.title}</a> {h.status === "STOPPED" ? <StatusBadge status="CLOSED" /> : null}
+                  <span className="block text-sm text-[var(--color-ink-muted)]">{[`${h.items} exercise${h.items === 1 ? "" : "s"}`, formatDate(h.created_at), h.author_name, h.episode_title].filter(Boolean).join(" · ")}</span></span>
+                {canWrite && h.status === "ACTIVE" ? (
+                  <ActionForm action={stopHomeProgrammeAction} confirm="Mark this sheet as stopped? It stays on the record.">
+                    <input type="hidden" name="programmeId" value={h.id} /><input type="hidden" name="patientId" value={c.patient.id} />
+                    <SubmitButton small variant="secondary">Stop</SubmitButton>
+                  </ActionForm>
+                ) : null}
+              </li>))}</ul>
+          )}
+          {canWrite ? <p className="mt-3"><Link href={`/admin/chart/${c.patient.id}/exercises/new`} className="btn btn-primary btn-sm">New exercise sheet</Link></p> : null}
         </section>
 
         <section className="card xl:col-span-2" aria-labelledby="v-h">
