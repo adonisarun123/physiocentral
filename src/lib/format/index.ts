@@ -81,6 +81,49 @@ export function hoursSummary(hours: { weekday: number; opens: string; closes: st
     .join(" · ");
 }
 
+/** "16:00" → "4 pm", "08:30" → "8:30 am" — for tight spaces. */
+function timeShort(hhmm: string): string {
+  const [h, m] = hhmm.split(":").map(Number);
+  return `${((h + 11) % 12) + 1}${m ? `:${String(m).padStart(2, "0")}` : ""} ${h < 12 ? "am" : "pm"}`;
+}
+
+/**
+ * Fixed weekly timings in compact lines for small cards, open days only:
+ * ["Mon–Sat 8:30 am–1:30 pm, 4–9 pm", "Sun 10 am–1 pm"]. Same source as hoursSummary,
+ * and never "open now" — the clinic asked for timings that read the same at any hour.
+ */
+export function hoursCardLines(hours: { weekday: number; opens: string; closes: string }[]): string[] {
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  const compact = (weekday: number): string | null => {
+    const list: { opens: string; closes: string }[] = [];
+    for (const h of hours.filter((x) => x.weekday === weekday).sort((a, b) => a.opens.localeCompare(b.opens))) {
+      const last = list[list.length - 1];
+      if (last && h.opens <= last.closes) { if (h.closes > last.closes) last.closes = h.closes; }
+      else list.push({ opens: h.opens, closes: h.closes });
+    }
+    if (!list.length) return null;
+    return list.map(({ opens, closes }) => {
+      const a = timeShort(opens), b = timeShort(closes);
+      const sameHalf = (Number(opens.slice(0, 2)) < 12) === (Number(closes.slice(0, 2)) < 12);
+      return `${sameHalf ? a.replace(/ (am|pm)$/, "") : a}–${b}`;
+    }).join(", ");
+  };
+  const out: string[] = [];
+  let start = 0;
+  for (let i = 1; i <= order.length; i++) {
+    const prev = compact(order[i - 1]);
+    const cur = i < order.length ? compact(order[i]) : undefined;
+    if (cur !== prev) {
+      if (prev) {
+        const a = WEEKDAYS[order[start]].slice(0, 3), b = WEEKDAYS[order[i - 1]].slice(0, 3);
+        out.push(`${start === i - 1 ? a : `${a}–${b}`} ${prev}`);
+      }
+      start = i;
+    }
+  }
+  return out;
+}
+
 /** Out-patient number as staff see it: 27 → "OP-0027". Null until the patient has one. */
 export function formatOpNumber(n: number | null | undefined): string | null {
   return n == null ? null : `OP-${String(n).padStart(4, "0")}`;
