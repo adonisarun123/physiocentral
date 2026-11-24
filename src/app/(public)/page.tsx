@@ -4,13 +4,13 @@ import type { Metadata } from "next";
 import { ArrowRight, CalendarCheck, UserRound, ReceiptText, House, Plus, Phone } from "lucide-react";
 import { getOpeningHours, getPublicBranches, getPublicClinic, getPublicServices, getPublicTherapists } from "@/modules/content/public";
 import { JsonLd, clinicJsonLd } from "@/modules/content/schema";
-import { telHref, displayPhone, hoursSummary } from "@/lib/format";
+import { telHref, displayPhone, hoursSummary, hoursCardLines } from "@/lib/format";
 import { BODY_AREAS } from "@/components/site/body-areas";
 import { iconForCategory } from "@/components/site/icon";
 import { HeroVisual, type HeroLiveData } from "@/components/site/hero-visual";
 import { Marquee } from "@/components/site/marquee";
 import { MediaPanel, serviceImage } from "@/components/site/media";
-import { nextAvailableLabel, openStatus } from "@/modules/content/live";
+import { nextAvailableLabel } from "@/modules/content/live";
 import { ORTHO } from "@/components/site/ortho-referral";
 import { pageOpenGraph } from "@/lib/seo";
 
@@ -28,10 +28,8 @@ export default async function HomePage() {
   const ld = clinic && branch ? clinicJsonLd(clinic, branch, services, hours) : null;
   const response = branch?.responseWindow ?? "within one working day";
   const firstBookable = services.find((s) => s.bookable);
-  const [nextSlot, open] = branch
-    ? await Promise.all([firstBookable ? nextAvailableLabel(branch.id, firstBookable.id) : Promise.resolve(null), openStatus(branch.id)])
-    : [null, null];
-  const live: HeroLiveData = { nextSlotLabel: nextSlot, openLabel: open?.label ?? null, openNow: open?.openNow ?? false, place: branch?.addressVerified ? "Sector 2, HSR Layout" : branch?.locality ?? null };
+  const nextSlot = branch && firstBookable ? await nextAvailableLabel(branch.id, firstBookable.id) : null;
+  const live: HeroLiveData = { nextSlotLabel: nextSlot, hoursLines: hoursCardLines(hours), place: branch?.addressVerified ? "Sector 2, HSR Layout" : branch?.locality ?? null };
   const featured = FEATURED.map((k) => services.find((s) => s.slug.includes(k))).filter(Boolean) as typeof services;
   const cards = (featured.length === 3 ? featured : services.slice(0, 3));
   const sessionMins = services.find((s) => s.bookable && !/assess/i.test(s.slug))?.durationMinutes ?? 45;
