@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
-import { ArrowRight, CalendarCheck, UserRound, ReceiptText, House, Plus, Phone } from "lucide-react";
+import { ArrowRight, CalendarCheck, UserRound, ReceiptText, House, Plus, Phone, MapPin } from "lucide-react";
 import { getOpeningHours, getPublicBranches, getPublicClinic, getPublicServices, getPublicTherapists } from "@/modules/content/public";
 import { JsonLd, clinicJsonLd } from "@/modules/content/schema";
 import { telHref, displayPhone, hoursSummary, hoursCardLines } from "@/lib/format";
@@ -35,6 +35,13 @@ export default async function HomePage() {
   const sessionMins = services.find((s) => s.bookable && !/assess/i.test(s.slug))?.durationMinutes ?? 45;
   const openDays = new Set(hours.map((h) => h.weekday)).size;
   const phone = branch?.phone ?? clinic?.phone ?? null;
+  const heroPlace = live.place;
+  // Hero figures: session length and open days come from the DB; Dr Sunku's experience is from his own site.
+  const heroStats = [
+    { n: String(sessionMins), u: "min", l: "one-to-one sessions" },
+    ...(openDays ? [{ n: String(openDays), u: "days", l: "open every week" }] : []),
+    { n: "10+", u: "yrs", l: "Dr Sunku in orthopaedics" },
+  ];
 
   const benefits = [
     { icon: CalendarCheck, title: "Book online", body: `Choose a time in about two minutes. We confirm ${response}.` },
@@ -48,26 +55,34 @@ export default async function HomePage() {
       {ld ? <JsonLd data={ld} /> : null}
 
       {/* ───── Hero ───── */}
-      <section>
-        <div className="wrap grid items-center gap-14 pt-14 pb-20 lg:grid-cols-[1fr_1.08fr] lg:pt-20 lg:pb-24">
-          <div data-reveal>
-            <span className="brand-rule" aria-hidden="true"><i /><i /><i /></span>
-            <h1 className="display-large mt-6 max-w-xl">Expert physiotherapy for every body</h1>
-            <p className="body-large mt-5 max-w-lg text-[var(--color-ink-muted)]">A modern clinic experience built around your goals. Book online, one-to-one care, and fees agreed before treatment.</p>
-            <div className="mt-9 flex flex-wrap gap-3">
-              <Link href="/book" className="btn btn-primary">Request appointment</Link>
-              <Link href="/contact#visit" className="btn btn-secondary">Get directions <ArrowRight size={18} aria-hidden="true" /></Link>
-            </div>
-            <Link href="/about#doctor-h" className="group mt-10 flex max-w-lg items-center gap-4 border-t border-[var(--color-line)] pt-6 no-underline">
-              <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-full ring-2 ring-white shadow-sm">
-                <Image src="/images/team/dr-nitin-sunku.webp" alt="" fill sizes="56px" className="object-cover object-top" />
-              </span>
-              <span className="body-medium text-[var(--color-ink-muted)]">
-                Clinical direction by <span className="font-semibold text-[var(--color-ink)] group-hover:underline">{ORTHO.name}</span>, consultant orthopaedic &amp; sports-medicine surgeon
-              </span>
+      <section className="hero-modern">
+        <div className="wrap grid items-center gap-14 pt-12 pb-20 lg:grid-cols-[1fr_1.05fr] lg:gap-16 lg:pt-20 lg:pb-28">
+          <div>
+            <Link href="/contact#visit" className="hero-eyebrow state" data-reveal>
+              <span className="hero-eyebrow-dots" aria-hidden="true"><i /><i /><i /></span>
+              Surgeon-led physiotherapy{heroPlace ? <span className="hidden items-center gap-2 min-[440px]:inline-flex"><span aria-hidden="true" className="opacity-40">/</span><MapPin size={14} aria-hidden="true" />{heroPlace}</span> : null}
             </Link>
+            <h1 className="hero-title mt-6 max-w-[14ch]" data-reveal="60">
+              Expert physiotherapy for{" "}
+              <span className="hero-accent">every body
+                <svg viewBox="0 0 300 18" preserveAspectRatio="none" aria-hidden="true"><path d="M3 12.5C52 4.5 108 3 158 6.5c46 3.2 92 5.5 139 1.5" pathLength={1} /></svg>
+              </span>
+            </h1>
+            <p className="body-large mt-6 max-w-lg text-[1.125rem] text-[var(--color-ink-muted)]" data-reveal="120">A modern clinic experience built around your goals. Book online, one-to-one care, and fees agreed before treatment.</p>
+            <div className="mt-9 flex flex-wrap gap-3" data-reveal="180">
+              <Link href="/book" className="btn btn-primary hero-cta">Request appointment <span className="hero-cta-arrow" aria-hidden="true"><ArrowRight size={16} /></span></Link>
+              <Link href="/contact#visit" className="btn btn-secondary bg-white/60 backdrop-blur-sm">Get directions</Link>
+            </div>
+            <ul className="hero-stats mt-11" data-reveal="240">
+              {heroStats.map((x) => (
+                <li key={x.l}>
+                  <span className="font-display block text-[clamp(1.75rem,3.2vw,2.25rem)] leading-none text-[var(--color-ink)]">{x.n}<span className="ml-1 font-sans text-[0.45em] font-semibold text-[var(--md-sys-color-primary)]">{x.u}</span></span>
+                  <span className="body-small mt-2 block text-[var(--color-ink-muted)] sm:whitespace-nowrap">{x.l}</span>
+                </li>
+              ))}
+            </ul>
           </div>
-          <HeroVisual live={live} />
+          <HeroVisual live={live} lead={{ name: ORTHO.name, role: "Orthopaedic & sports-medicine surgeon", href: "/about#doctor-h", photo: "/images/team/dr-nitin-sunku.webp" }} />
         </div>
       </section>
 
