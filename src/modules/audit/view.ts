@@ -30,6 +30,21 @@ const ACTION_LABELS: Record<string, string> = {
   "clinical.goal.progress": "Recorded goal progress",
   "clinical.measurement.add": "Recorded measurement",
   "clinical.measurement.void": "Struck out measurement",
+  "clinical.document.upload": "Uploaded scan / report",
+  "clinical.document.view": "Opened scan / report",
+  "clinical.document.remove": "Removed scan / report",
+  "clinical.hep.create": "Issued home exercise sheet",
+  "clinical.hep.view": "Opened home exercise sheet",
+  "clinical.hep.stop": "Stopped home exercise sheet",
+  "clinical.exercise.create": "Added exercise to library",
+  "clinical.exercise.update": "Edited library exercise",
+  "clinical.exercise.hide": "Hid library exercise",
+  "clinical.exercise.restore": "Restored library exercise",
+  "expense.record": "Recorded expense",
+  "expense.void": "Voided expense",
+  "payment.reminder": "Emailed payment reminder",
+  "payment.reminder_failed": "Payment reminder failed",
+  "package.validity": "Changed package validity",
   "patient.create": "Registered patient",
   "patient.update": "Edited patient details",
 };
@@ -46,7 +61,7 @@ export async function listAuditEvents(actor: StaffActor, f: { category?: string;
   const where: string[] = ["e.organization_id=$1"];
   const params: unknown[] = [actor.organizationId];
   const add = (sql: string, v: unknown) => { params.push(v); where.push(sql.replace("?", `$${params.length}`)); };
-  if (cat.value === "billing") where.push(`(e.action LIKE 'invoice.%' OR e.action LIKE 'payment.%' OR e.action LIKE 'refund.%' OR e.action LIKE 'estimate.%' OR e.action LIKE 'credit_note.%' OR e.action LIKE 'receipt.%' OR e.action LIKE 'charge.%')`);
+  if (cat.value === "billing") where.push(`(e.action LIKE 'invoice.%' OR e.action LIKE 'payment.%' OR e.action LIKE 'refund.%' OR e.action LIKE 'estimate.%' OR e.action LIKE 'credit_note.%' OR e.action LIKE 'receipt.%' OR e.action LIKE 'charge.%' OR e.action LIKE 'expense.%')`);
   else if (cat.prefix) add("e.action LIKE ?", `${cat.prefix}%`);
   if (f.staffId && /^[0-9a-f-]{36}$/i.test(f.staffId)) add("e.actor = ?", `staff:${f.staffId}`);
   if (f.from && /^\d{4}-\d{2}-\d{2}$/.test(f.from)) add("e.created_at >= (?::date)::timestamp AT TIME ZONE 'Asia/Kolkata'", f.from);

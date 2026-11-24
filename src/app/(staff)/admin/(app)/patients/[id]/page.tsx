@@ -17,6 +17,9 @@ import { CURRENT_AGE_SQL, sexLabel } from "@/modules/patients/admin";
 import { listPackages } from "@/modules/scheduling/packages";
 import { canOpenChart } from "@/modules/clinical/access";
 import { IntakeForm } from "@/components/clinical/parts";
+import { DocumentUpload } from "@/components/admin/document-upload";
+import { documentCount } from "@/modules/patients/documents";
+import { sendReminderAction } from "../../../ops-actions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Patient" };
@@ -31,7 +34,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
     `SELECT p.id, p.public_ref, p.op_number, p.full_name, p.created_at, ${CURRENT_AGE_SQL} age, p.sex, p.address
        FROM patient p WHERE p.id=$1 AND p.organization_id=$2`, [id, actor.organizationId]);
   if (!p) notFound();
-  const [contacts, visits, invoices, payments, packages, chartAccess, intakes] = await Promise.all([
+  const [contacts, visits, invoices, payments, packages, chartAccess, intakes, docCount] = await Promise.all([
     q<{ kind: string; value: string }>(`SELECT kind, value FROM patient_contact WHERE patient_id=$1 ORDER BY preferred DESC, created_at`, [id]),
     q<{ id: string; public_ref: string; starts_at: Date; status: string; service: string; therapist: string | null; source: string; package_name: string | null }>(
       `SELECT a.id, a.public_ref, a.starts_at, a.status, s.name service, t.display_name therapist, a.source,
@@ -47,6 +50,8 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
     canOpenChart(actor, id),
     // Reception sees that an intake arrived, never what it says.
     q<{ created_at: Date }>(`SELECT created_at FROM intake_submission WHERE patient_id=$1 ORDER BY created_at DESC`, [id]),
+    // Reception sees how many documents are on file, never their names or contents.
+    documentCount(actor, id),
   ]);
   const phone = contacts.find((c) => c.kind === "PHONE")?.value ?? "";
   const email = contacts.find((c) => c.kind === "EMAIL")?.value ?? "";
@@ -65,7 +70,15 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         {chartAccess ? <Link href={`/admin/chart/${p.id}`} className="btn btn-secondary">Clinical record</Link> : null}
       </PageHeader>
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
-        <div className="card"><p className="text-sm text-[var(--color-ink-muted)]">Amount due</p><p className="text-2xl font-bold">{formatINR(due)}</p></div>
+        <div className="card"><p className="text-sm text-[var(--color-ink-muted)]">Amount due</p><p className="text-2xl font-bold">{formatINR(due)}</p>
+          {due > 0n && can(actor, "PAYMENT_REMIND") ? (
+            email ? (
+              <ActionForm action={sendReminderAction} className="mt-2">
+                <input type="hidden" name="patientId" value={p.id} />
+                <SubmitButton small variant="secondary">Email payment reminder</SubmitButton>
+              </ActionForm>
+            ) : <p className="mt-1 text-xs text-[var(--color-ink-muted)]">No email on file for reminders.</p>
+          ) : null}</div>
         <div className="card"><p className="text-sm text-[var(--color-ink-muted)]">Unapplied credit</p><p className="text-2xl font-bold">{formatINR(credit)}</p></div>
         <div className="card"><p className="text-sm text-[var(--color-ink-muted)]">Visits</p><p className="text-xl font-bold">{visits.filter((v) => v.status === "COMPLETED").length} completed · {visits.filter((v) => v.status === "CONFIRMED" && new Date(v.starts_at) > new Date()).length} upcoming</p></div>
       </div>
@@ -75,6 +88,14 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
         <details className="mt-2"><summary className="cursor-pointer font-semibold">Complete intake at reception</summary>
           <div className="mt-2"><IntakeForm ctx={{ patientId: p.id }} idPrefix="rin" /></div></details>
       </section>
+      {can(actor, "DOCUMENT_UPLOAD") ? (
+        <section className="card mb-6" aria-labelledby="docs-h">
+          <h2 id="docs-h" className="text-lg font-bold">Scans &amp; reports</h2>
+          <p className="text-sm text-[var(--color-ink-muted)]">{docCount ? `${docCount} document${docCount === 1 ? "" : "s"} on file.` : "No documents yet."} {chartAccess ? <Link href={`/admin/chart/${p.id}#doc-h`}>Open them in the clinical record</Link> : "The physiotherapist opens them in the clinical record."}</p>
+          <details className="mt-2"><summary className="cursor-pointer font-semibold">Upload a scan or report the patient brought</summary>
+            <div className="mt-2"><DocumentUpload patientId={p.id} idPrefix="ptdoc" /></div></details>
+        </section>
+      ) : null}
       {packages.length ? (
         <section className="card mb-6">
           <h2 className="text-lg font-bold">Packages</h2>
@@ -82,7 +103,7 @@ export default async function PatientPage({ params }: { params: Promise<{ id: st
             <li key={k.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
               <span><Link href={`/admin/packages/${k.id}`} className="font-semibold">{k.name}</Link> <span className="font-mono text-xs">{k.public_ref}</span>
                 <span className="block text-sm text-[var(--color-ink-muted)]">{k.first_at ? `${formatDate(k.first_at)} → ${formatDate(k.last_at!)}` : "no sessions booked"}{k.status === "CLOSED" ? " · closed" : ""}</span></span>
-              <PackageProgress total={k.sessions_total} done={k.done} booked={k.upcoming} missed={k.no_show} />
+              <PackageProgress total={k.sessions_total} done={k.done} booked={k.upcoming} missed={k.no_show} validUntil={k.valid_until} expired={k.expired} />
             </li>))}</ul>
         </section>
       ) : null}

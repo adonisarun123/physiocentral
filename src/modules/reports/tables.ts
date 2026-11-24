@@ -3,13 +3,19 @@
  * and the CSV export so the two can never disagree. Pure: no DB access.
  * `money` decides how paise are shown (₹ formatting on screen, plain rupees in CSV).
  */
+import { categoryLabel } from "@/modules/finance/expense-constants";
+
 type Money = (paise: string) => string;
-export type Table = { title: string; header: string[]; numeric: boolean[]; rows: string[][]; totals: string[] | null };
+export type Table = {
+  title: string; header: string[]; numeric: boolean[]; rows: string[][]; totals: string[] | null;
+  /** Extra label/value lines shown under the table (and appended to the CSV), outside the totals. */
+  notes?: string[][];
+};
 
 type DayIn = {
   day: string; completed: number; no_show: number; cancelled: number; new_patients: number;
   billed_paise: string; credited_paise: string; cash_paise: string; upi_paise: string; other_paise: string;
-  collected_paise: string; refunded_paise: string; net_paise: string;
+  collected_paise: string; refunded_paise: string; net_paise: string; expenses_paise: string; profit_paise: string;
 };
 type TherapistIn = { therapist: string; completed: number; no_show: number; cancelled: number; patients: number; billed_paise: string };
 type StaffIn = {
@@ -22,11 +28,11 @@ const sumInt = <T>(rows: T[], f: (r: T) => number) => rows.reduce((a, r) => a + 
 const sumPaise = <T>(rows: T[], f: (r: T) => string) => rows.reduce((a, r) => a + BigInt(f(r)), 0n).toString();
 
 export function dayTable(rows: DayIn[], money: Money): Table {
-  const header = ["Date", "Visits done", "No-shows", "Cancelled", "New patients", "Billed", "Credit notes", "Cash", "UPI", "Bank / other", "Collected", "Refunded", "Net collected"];
+  const header = ["Date", "Visits done", "No-shows", "Cancelled", "New patients", "Billed", "Credit notes", "Cash", "UPI", "Bank / other", "Collected", "Refunded", "Net collected", "Expenses", "Profit"];
   const cells = (r: DayIn) => [
     String(r.completed), String(r.no_show), String(r.cancelled), String(r.new_patients),
     money(r.billed_paise), money(r.credited_paise), money(r.cash_paise), money(r.upi_paise), money(r.other_paise),
-    money(r.collected_paise), money(r.refunded_paise), money(r.net_paise),
+    money(r.collected_paise), money(r.refunded_paise), money(r.net_paise), money(r.expenses_paise), money(r.profit_paise),
   ];
   const total: DayIn = {
     day: "Total",
@@ -35,6 +41,7 @@ export function dayTable(rows: DayIn[], money: Money): Table {
     billed_paise: sumPaise(rows, (r) => r.billed_paise), credited_paise: sumPaise(rows, (r) => r.credited_paise),
     cash_paise: sumPaise(rows, (r) => r.cash_paise), upi_paise: sumPaise(rows, (r) => r.upi_paise), other_paise: sumPaise(rows, (r) => r.other_paise),
     collected_paise: sumPaise(rows, (r) => r.collected_paise), refunded_paise: sumPaise(rows, (r) => r.refunded_paise), net_paise: sumPaise(rows, (r) => r.net_paise),
+    expenses_paise: sumPaise(rows, (r) => r.expenses_paise), profit_paise: sumPaise(rows, (r) => r.profit_paise),
   };
   return {
     title: "Day-wise summary", header, numeric: header.map((_, i) => i > 0),
@@ -81,5 +88,41 @@ export function serviceTable(rows: ServiceIn[], money: Money): Table {
     rows: rows.map((r) => [r.service, String(r.completed), String(r.no_show), String(r.cancelled), r.units_billed, money(r.billed_paise), money(r.avg_paise)]),
     totals: rows.length ? ["Total", String(sumInt(rows, (r) => r.completed)), String(sumInt(rows, (r) => r.no_show)),
       String(sumInt(rows, (r) => r.cancelled)), "—", money(sumPaise(rows, (r) => r.billed_paise)), "—"] : null,
+  };
+}
+
+type ProfitIn = {
+  billed_paise: string; credited_paise: string; collected_paise: string; refunded_paise: string; net_paise: string;
+  expenses_paise: string; profit_paise: string; outstanding_paise: string;
+};
+type CategoryIn = { category: string; entries: number; amount_paise: string };
+
+/** Money in, money out, profit. Cash basis: collections and expenses on the day they happened. */
+export function profitTable(s: ProfitIn, money: Money): Table {
+  const header = ["Item", "Amount"];
+  const neg = (p: string) => money((-BigInt(p)).toString());
+  return {
+    title: "Profit summary", header, numeric: [false, true],
+    rows: [
+      ["Collected (verified payments)", money(s.collected_paise)],
+      ["Less refunds paid back", neg(s.refunded_paise)],
+      ["Net collected", money(s.net_paise)],
+      ["Less expenses", neg(s.expenses_paise)],
+    ],
+    totals: ["Profit (net collected − expenses)", money(s.profit_paise)],
+    notes: [
+      ["Billed in this period (issued bills)", money(s.billed_paise)],
+      ["Credit notes raised in this period", money(s.credited_paise)],
+      ["Still to collect today (all unpaid bills)", money(s.outstanding_paise)],
+    ],
+  };
+}
+
+export function expenseCategoryTable(rows: CategoryIn[], money: Money): Table {
+  const header = ["Expense category", "Entries", "Amount"];
+  return {
+    title: "Expenses by category", header, numeric: [false, true, true],
+    rows: rows.map((r) => [categoryLabel(r.category), String(r.entries), money(r.amount_paise)]),
+    totals: rows.length ? ["Total", String(sumInt(rows, (r) => r.entries)), money(sumPaise(rows, (r) => r.amount_paise))] : null,
   };
 }

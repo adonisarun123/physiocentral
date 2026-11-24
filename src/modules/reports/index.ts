@@ -1,7 +1,8 @@
 import "server-only";
 import { q } from "@/lib/db";
 import { assertPermission, type StaffActor } from "@/modules/auth/actor";
-import { dayTable, serviceTable, staffTable, therapistTable, type Table } from "./tables";
+import { dayTable, expenseCategoryTable, profitTable, serviceTable, staffTable, therapistTable, type Table } from "./tables";
+import type { ReportView } from "./range";
 
 /**
  * Operational reports for the owner and billing desk: day-wise, user-wise and
@@ -14,6 +15,8 @@ import { dayTable, serviceTable, staffTable, therapistTable, type Table } from "
  * - Collected: VERIFIED payments by the date received. Pending, failed and
  *   reversed (entry-error) payments are excluded.
  * - Refunded: refunds by the date the money was paid back.
+ * - Expenses: recorded (not voided) expenses by the date paid.
+ * - Profit: net collected − expenses (cash basis: money in minus money out).
  * All money values are returned as paise strings.
  */
 
@@ -23,7 +26,7 @@ export type DayRow = {
   day: string; completed: number; no_show: number; cancelled: number; new_patients: number;
   billed_paise: string; credited_paise: string;
   cash_paise: string; upi_paise: string; other_paise: string; collected_paise: string;
-  refunded_paise: string; net_paise: string;
+  refunded_paise: string; net_paise: string; expenses_paise: string; profit_paise: string;
 };
 
 export async function dayWise(actor: StaffActor, from: string, to: string): Promise<DayRow[]> {
@@ -61,18 +64,25 @@ export async function dayWise(actor: StaffActor, from: string, to: string): Prom
      refunded AS (
        SELECT r.refunded_on AS day, sum(r.amount_paise) AS amt
          FROM payment_refund r WHERE r.organization_id = $1
-          AND r.refunded_on BETWEEN $2::date AND $3::date GROUP BY 1)
+          AND r.refunded_on BETWEEN $2::date AND $3::date GROUP BY 1),
+     spent AS (
+       SELECT e.spent_on AS day, sum(e.amount_paise) AS amt
+         FROM expense e WHERE e.organization_id = $1 AND e.status = 'RECORDED'
+          AND e.spent_on BETWEEN $2::date AND $3::date GROUP BY 1)
      SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
             COALESCE(v.completed, 0) AS completed, COALESCE(v.no_show, 0) AS no_show, COALESCE(v.cancelled, 0) AS cancelled,
             COALESCE(n.n, 0) AS new_patients,
             COALESCE(b.amt, 0)::text AS billed_paise, COALESCE(c.amt, 0)::text AS credited_paise,
             COALESCE(p.cash, 0)::text AS cash_paise, COALESCE(p.upi, 0)::text AS upi_paise, COALESCE(p.other, 0)::text AS other_paise,
             COALESCE(p.total, 0)::text AS collected_paise, COALESCE(r.amt, 0)::text AS refunded_paise,
-            (COALESCE(p.total, 0) - COALESCE(r.amt, 0))::text AS net_paise
+            (COALESCE(p.total, 0) - COALESCE(r.amt, 0))::text AS net_paise,
+            COALESCE(x.amt, 0)::text AS expenses_paise,
+            (COALESCE(p.total, 0) - COALESCE(r.amt, 0) - COALESCE(x.amt, 0))::text AS profit_paise
        FROM days d
        LEFT JOIN visits v ON v.day = d.day LEFT JOIN newp n ON n.day = d.day
        LEFT JOIN billed b ON b.day = d.day LEFT JOIN credited c ON c.day = d.day
        LEFT JOIN paid p ON p.day = d.day LEFT JOIN refunded r ON r.day = d.day
+       LEFT JOIN spent x ON x.day = d.day
       ORDER BY d.day DESC`,
     [actor.organizationId, from, to],
   );
@@ -223,11 +233,51 @@ export async function serviceWise(actor: StaffActor, from: string, to: string): 
   );
 }
 
+export type ProfitSummary = {
+  billed_paise: string; credited_paise: string; collected_paise: string; refunded_paise: string; net_paise: string;
+  expenses_paise: string; profit_paise: string; outstanding_paise: string;
+};
+export type ExpenseCategoryRow = { category: string; entries: number; amount_paise: string };
+
+/** Profit & expenses for a period: money in, money out, and spending by category. */
+export async function profitAndExpenses(actor: StaffActor, from: string, to: string) {
+  assertPermission(actor, "FINANCE_VIEW");
+  const org = actor.organizationId;
+  const [summary, categories] = await Promise.all([
+    q<ProfitSummary>(
+      `WITH b AS (SELECT COALESCE(sum(total_paise), 0) amt FROM invoice WHERE organization_id = $1 AND status = 'ISSUED'
+                    AND issued_at >= ($2::date::timestamp AT TIME ZONE '${TZ}') AND issued_at < (($3::date + 1)::timestamp AT TIME ZONE '${TZ}')),
+            c AS (SELECT COALESCE(sum(amount_paise), 0) amt FROM credit_note WHERE organization_id = $1
+                    AND created_at >= ($2::date::timestamp AT TIME ZONE '${TZ}') AND created_at < (($3::date + 1)::timestamp AT TIME ZONE '${TZ}')),
+            p AS (SELECT COALESCE(sum(amount_paise), 0) amt FROM payment WHERE organization_id = $1 AND status = 'VERIFIED'
+                    AND received_on BETWEEN $2::date AND $3::date),
+            r AS (SELECT COALESCE(sum(amount_paise), 0) amt FROM payment_refund WHERE organization_id = $1
+                    AND refunded_on BETWEEN $2::date AND $3::date),
+            x AS (SELECT COALESCE(sum(amount_paise), 0) amt FROM expense WHERE organization_id = $1 AND status = 'RECORDED'
+                    AND spent_on BETWEEN $2::date AND $3::date),
+            o AS (SELECT COALESCE(sum(amount_due_paise), 0) amt FROM invoice_balance WHERE organization_id = $1)
+       SELECT b.amt::text billed_paise, c.amt::text credited_paise, p.amt::text collected_paise, r.amt::text refunded_paise,
+              (p.amt - r.amt)::text net_paise, x.amt::text expenses_paise, (p.amt - r.amt - x.amt)::text profit_paise, o.amt::text outstanding_paise
+         FROM b, c, p, r, x, o`,
+      [org, from, to]),
+    q<ExpenseCategoryRow>(
+      `SELECT category, count(*)::int entries, sum(amount_paise)::text amount_paise
+         FROM expense WHERE organization_id = $1 AND status = 'RECORDED' AND spent_on BETWEEN $2::date AND $3::date
+        GROUP BY category ORDER BY sum(amount_paise) DESC`,
+      [org, from, to]),
+  ]);
+  return { summary: summary[0], categories };
+}
+
 /** Load one report view as display/CSV tables. */
 export async function loadReportTables(
-  actor: StaffActor, view: "day" | "user" | "service", from: string, to: string, money: (paise: string) => string,
+  actor: StaffActor, view: ReportView, from: string, to: string, money: (paise: string) => string,
 ): Promise<Table[]> {
   if (view === "day") return [dayTable(await dayWise(actor, from, to), money)];
+  if (view === "profit") {
+    const { summary, categories } = await profitAndExpenses(actor, from, to);
+    return [profitTable(summary, money), expenseCategoryTable(categories, money)];
+  }
   if (view === "service") return [serviceTable(await serviceWise(actor, from, to), money)];
   const { therapists, staff } = await userWise(actor, from, to);
   return [therapistTable(therapists, money), staffTable(staff, money)];

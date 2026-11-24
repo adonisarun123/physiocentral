@@ -23,6 +23,7 @@ describe("report ranges", () => {
   });
   it("only accepts known views", () => {
     expect(resolveView("service")).toBe("service");
+    expect(resolveView("profit")).toBe("profit");
     expect(resolveView("drop table")).toBe("day");
   });
 });
@@ -37,9 +38,10 @@ describe("report output", () => {
   });
   it("totals day rows exactly in paise", () => {
     const row = { completed: 1, no_show: 0, cancelled: 1, new_patients: 1, billed_paise: "60000", credited_paise: "0",
-      cash_paise: "50000", upi_paise: "10000", other_paise: "0", collected_paise: "60000", refunded_paise: "10000", net_paise: "50000" };
+      cash_paise: "50000", upi_paise: "10000", other_paise: "0", collected_paise: "60000", refunded_paise: "10000", net_paise: "50000",
+      expenses_paise: "70000", profit_paise: "-20000" };
     const t = dayTable([{ ...row, day: "2026-11-21" }, { ...row, day: "2026-11-20" }], paiseToRupees);
-    expect(t.totals).toEqual(["Total", "2", "0", "2", "2", "1200.00", "0.00", "1000.00", "200.00", "0.00", "1200.00", "200.00", "1000.00"]);
+    expect(t.totals).toEqual(["Total", "2", "0", "2", "2", "1200.00", "0.00", "1000.00", "200.00", "0.00", "1200.00", "200.00", "1000.00", "1400.00", "-400.00"]);
   });
   it("returns no totals for an empty period", () => {
     expect(serviceTable([], paiseToRupees).totals).toBeNull();

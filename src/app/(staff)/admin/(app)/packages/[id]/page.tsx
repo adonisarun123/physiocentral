@@ -10,6 +10,7 @@ import { getPackage, packageSessions } from "@/modules/scheduling/packages";
 import { formatINR } from "@/modules/billing/money";
 import { displayPhone, formatDateTime } from "@/lib/format";
 import { packageStatusAction } from "../../../actions";
+import { packageValidityAction } from "../../../ops-actions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Package" };
@@ -35,7 +36,7 @@ export default async function PackagePage({ params, searchParams }: { params: Pr
         {showContact ? <Link href={`/admin/patients/${k.patient_id}`} className="font-semibold">{k.patient}</Link> : <span className="font-semibold">{k.patient}</span>}
         {showContact && k.phone ? ` · ${displayPhone(k.phone)}` : ""} · <span className="font-mono">{k.public_ref}</span>
         {k.price_paise ? ` · ${formatINR(k.price_paise)}` : ""}{k.status === "CLOSED" ? " · closed" : ""}</>}>
-        {can(actor, "APPOINTMENT_ACCEPT") && k.status === "ACTIVE" && left > 0
+        {can(actor, "APPOINTMENT_ACCEPT") && k.status === "ACTIVE" && left > 0 && !k.expired
           ? <Link href={`/admin/book?patient=${k.patient_id}&package=${k.id}`} className="btn btn-primary">Book a remaining session</Link> : null}
         {can(actor, "INVOICE_DRAFT") ? <Link href={`/admin/invoices/new?${bill.toString()}`} className="btn btn-secondary">Bill this package</Link> : null}
       </PageHeader>
@@ -48,8 +49,25 @@ export default async function PackagePage({ params, searchParams }: { params: Pr
         </div>
       ) : null}
 
-      <section className="card mb-6"><PackageProgress total={k.sessions_total} done={k.done} booked={k.upcoming} missed={k.no_show} />
-        <p className="mt-2 text-sm text-[var(--color-ink-muted)]">Visits in a package are not charged one by one; bill the package once with &quot;Bill this package&quot;. Cancelling a visit frees its place so it can be rebooked.</p>
+      {k.expired && k.status === "ACTIVE" && k.done + k.no_show < k.sessions_total ? (
+        <div className="mb-4"><Notice tone="warn" title="Package expired">
+          {k.sessions_total - k.done - k.no_show} session(s) were not used before {k.valid_until}. Booked visits after that date can&apos;t be checked in until you extend the validity below.
+        </Notice></div>
+      ) : null}
+
+      <section className="card mb-6"><PackageProgress total={k.sessions_total} done={k.done} booked={k.upcoming} missed={k.no_show} validUntil={k.valid_until} expired={k.expired} />
+        <p className="mt-2 text-sm text-[var(--color-ink-muted)]">A session is used up when the patient checks in (or misses it). Visits in a package are not charged one by one; bill the package once with &quot;Bill this package&quot;. Cancelling a visit frees its place so it can be rebooked.</p>
+        {can(actor, "APPOINTMENT_ACCEPT") ? (
+          <details className="mt-3"><summary className="cursor-pointer font-semibold">{k.valid_until ? "Change validity" : "Set an expiry date"}</summary>
+            <ActionForm action={packageValidityAction} className="mt-2 flex flex-wrap items-end gap-3">
+              <input type="hidden" name="packageId" value={k.id} />
+              <div><label className="field-label" htmlFor="pv-d">Valid until</label><input id="pv-d" name="validUntil" type="date" defaultValue={k.valid_until ?? ""} className="input" /></div>
+              <div className="min-w-64 flex-1"><label className="field-label" htmlFor="pv-r">Reason</label><input id="pv-r" name="reason" required minLength={3} maxLength={300} className="input" placeholder="e.g. patient was unwell for a week" /></div>
+              <SubmitButton small>Save</SubmitButton>
+            </ActionForm>
+            <p className="field-hint mt-1">Clear the date to remove the expiry. The change and reason are logged.</p>
+          </details>
+        ) : null}
       </section>
 
       <section className="card">

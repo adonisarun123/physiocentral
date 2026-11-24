@@ -193,6 +193,25 @@ export async function cancelAppointment(
   });
 }
 
+/**
+ * Before a package visit is checked in: the package must be open, not past its
+ * expiry date (clinic-local today), and have a session left. Sessions count as
+ * used once checked in (checked in, in progress, completed) or missed (no-show).
+ */
+async function assertPackageSessionAvailable(db: Db, appt: ApptRow) {
+  const pkg = await q1<{ status: string; sessions_total: number; valid_until: string | null; expired: boolean; used: number }>(
+    `SELECT k.status, k.sessions_total, to_char(k.valid_until,'YYYY-MM-DD') valid_until,
+            (k.valid_until IS NOT NULL AND (now() AT TIME ZONE b.timezone)::date > k.valid_until) expired,
+            (SELECT count(*)::int FROM appointment x WHERE x.package_id=k.id AND x.id<>$2
+                AND x.status IN ('CHECKED_IN','IN_PROGRESS','COMPLETED','NO_SHOW')) used
+       FROM patient_package k JOIN branch b ON b.id=$3 WHERE k.id=$1 FOR UPDATE OF k`,
+    [appt.package_id, appt.id, appt.branch_id], db);
+  if (!pkg) return;
+  if (pkg.status !== "ACTIVE") throw new DomainError("INVALID_TRANSITION", "This visit belongs to a closed package. Reopen the package, or cancel this visit and book it as a normal visit.");
+  if (pkg.expired) throw new DomainError("INVALID_TRANSITION", `This package expired on ${pkg.valid_until}. Extend it on the package page, or cancel this visit and book it as a normal visit.`);
+  if (pkg.used >= pkg.sessions_total) throw new DomainError("INVALID_TRANSITION", "All sessions in this package have been used.");
+}
+
 /** Attendance transitions. Completion creates the billable charge for the booked service (COST-05). */
 export async function transitionAppointment(
   actor: Actor,
@@ -216,6 +235,8 @@ export async function transitionAppointment(
       );
       if (!ok?.ok) throw new DomainError("INVALID_TRANSITION", `No-show can be recorded ${NO_SHOW_THRESHOLD_MINUTES} minutes after the start time.`);
     }
+    // A package session is used up when the patient checks in (not when it is booked).
+    if (input.transition === "check_in" && appt.package_id) await assertPackageSessionAvailable(db, appt);
     await db.query(`UPDATE appointment SET status=$2, version=version+1, updated_at=now() WHERE id=$1`, [appt.id, rule.to]);
     await recordStatus(db, appt, rule.to, actor.label, null);
 

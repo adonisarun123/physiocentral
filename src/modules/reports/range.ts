@@ -2,7 +2,7 @@
  * Report date ranges and CSV output. Pure functions (no DB, no server-only),
  * so they are unit-tested directly. Dates are clinic-local calendar days (IST).
  */
-export const REPORT_VIEWS = ["day", "user", "service"] as const;
+export const REPORT_VIEWS = ["day", "profit", "user", "service"] as const;
 export type ReportView = (typeof REPORT_VIEWS)[number];
 
 export const MAX_RANGE_DAYS = 366;

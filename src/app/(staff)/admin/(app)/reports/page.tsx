@@ -13,12 +13,14 @@ export const metadata: Metadata = { title: "Reports" };
 
 const VIEWS: { id: ReportView; label: string }[] = [
   { id: "day", label: "Day-wise" },
+  { id: "profit", label: "Profit & expenses" },
   { id: "user", label: "User-wise" },
   { id: "service", label: "Service-wise" },
 ];
 
 const NOTES: Record<ReportView, string> = {
-  day: "Visits are counted on the appointment date. Billed = issued bills on their issue date (voided bills left out). Collected = verified payments on the date received. Refunds count on the day the money went back.",
+  day: "Visits are counted on the appointment date. Billed = issued bills on their issue date (voided bills left out). Collected = verified payments on the date received. Refunds count on the day the money went back. Expenses count on the day they were paid (voided entries left out). Profit = net collected − expenses.",
+  profit: "Cash basis: money actually received (verified payments, less refunds) minus money actually spent (recorded expenses), each on the day it happened. Bills not yet paid are not profit; they are shown separately as still to collect.",
   user: "Physiotherapist figures come from appointments assigned to them; a bill counts towards a physio only when it was raised from their visit. Staff figures show who made bookings, recorded and verified payments, issued bills and approved refunds.",
   service: "Visits are counted on the appointment date; billing comes from issued bill lines on their issue date. Charges added without a service (e.g. packages typed in by hand) appear under “Other charges”.",
 };
@@ -35,6 +37,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader title="Reports" lead={`${from === to ? from : `${from} to ${to}`} · clinic time (IST)`}>
+        {actor.permissions.has("EXPENSE_RECORD") ? <Link href="/admin/expenses" className="btn btn-secondary">Expenses</Link> : null}
         <a href={`/admin/reports/export?${qs({})}`} className="btn btn-secondary" download>Download CSV</a>
       </PageHeader>
 
@@ -82,6 +85,11 @@ function ReportTable({ table }: { table: Table }) {
               <tfoot><tr className="font-bold">{table.totals.map((c, i) => <td key={i} className={table.numeric[i] ? "num" : undefined}>{c}</td>)}</tr></tfoot>
             ) : null}
           </table>
+          {table.notes?.length ? (
+            <dl className="mt-3 grid gap-1 border-t border-[var(--color-line)] pt-3 text-sm">
+              {table.notes.map(([k, v]) => <div key={k} className="flex justify-between gap-4"><dt className="text-[var(--color-ink-muted)]">{k}</dt><dd className="num font-semibold">{v}</dd></div>)}
+            </dl>
+          ) : null}
         </div>
       )}
     </section>

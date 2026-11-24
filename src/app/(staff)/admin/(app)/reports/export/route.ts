@@ -13,7 +13,7 @@ export async function GET(req: Request) {
   const { from, to } = resolveRange(url.searchParams.get("from") ?? undefined, url.searchParams.get("to") ?? undefined, todayInZone());
   const tables = await loadReportTables(actor, view, from, to, paiseToRupees);
   const csv = tables
-    .map((t) => (tables.length > 1 ? `${t.title}\r\n` : "") + toCsv(t.header, t.totals ? [...t.rows, t.totals] : t.rows))
+    .map((t) => (tables.length > 1 ? `${t.title}\r\n` : "") + toCsv(t.header, [...t.rows, ...(t.totals ? [t.totals] : []), ...(t.notes ?? [])]))
     .join("\r\n");
   return new Response("﻿" + csv, {
     headers: {

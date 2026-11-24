@@ -65,7 +65,7 @@ async function bookOne(
   return { appointmentId: appt.id, reference, therapistId: chosen.therapist_id, startsAt: startsAt.toISOString() };
 }
 
-/** Sessions of a package that still hold a place (anything not cancelled / rejected). */
+/** Sessions of a package that still hold a place (anything not cancelled / rejected). Caps bookings, not usage. */
 export async function packageSessionsUsed(db: Db, packageId: string) {
   const r = await q1<{ n: number }>(
     `SELECT count(*)::int n FROM appointment WHERE package_id=$1 AND status NOT IN ('CANCELLED','REJECTED')`, [packageId], db);
@@ -93,11 +93,14 @@ export async function createStaffBooking(
       const ctx = await loadContext(db, actor, input.patientId, input.serviceId);
       let packageId: string | null = null;
       if (input.packageId) {
-        const pkg = await q1<{ id: string; sessions_total: number; status: string }>(
-          `SELECT id, sessions_total, status FROM patient_package WHERE id=$1 AND organization_id=$2 AND patient_id=$3 FOR UPDATE`,
-          [input.packageId, actor.organizationId, ctx.patientId], db);
+        const pkg = await q1<{ id: string; sessions_total: number; status: string; valid_until: string | null; past_expiry: boolean }>(
+          `SELECT id, sessions_total, status, to_char(valid_until,'YYYY-MM-DD') valid_until,
+                  (valid_until IS NOT NULL AND ($4::timestamptz AT TIME ZONE $5)::date > valid_until) past_expiry
+             FROM patient_package WHERE id=$1 AND organization_id=$2 AND patient_id=$3 FOR UPDATE`,
+          [input.packageId, actor.organizationId, ctx.patientId, new Date(input.startsAt).toISOString(), ctx.svc.timezone], db);
         if (!pkg) throw new DomainError("NOT_FOUND", "Package not found for this patient.");
         if (pkg.status !== "ACTIVE") throw new DomainError("VALIDATION", "This package is closed.");
+        if (pkg.past_expiry) throw new DomainError("VALIDATION", `This package is valid until ${pkg.valid_until}. Pick an earlier day, or extend the package first.`);
         if ((await packageSessionsUsed(db, pkg.id)) >= pkg.sessions_total) throw new DomainError("VALIDATION", "All sessions in this package are already booked.");
         packageId = pkg.id;
       }
@@ -126,6 +129,8 @@ export interface PackageBookingInput {
   name: string;
   sessions: number;
   pricePaise?: number | null;
+  /** Days the package stays valid, counted from the first session's day. null/undefined = no expiry. */
+  validDays?: number | null;
 }
 
 /**
@@ -143,15 +148,21 @@ export async function createPackageBooking(actor: Actor, input: PackageBookingIn
   const name = input.name.trim().slice(0, 120) || `${sessions}-session package`;
   if (input.pricePaise != null && (!Number.isInteger(input.pricePaise) || input.pricePaise < 0)) throw new DomainError("VALIDATION", "Enter a valid package price.");
   if (Number.isNaN(new Date(input.startsAt).getTime())) throw new DomainError("VALIDATION", "Choose a time for the first session.");
-  const maxDays = Math.min(sessions * 2 + 14, 120);
+  const validDays = input.validDays == null ? null : Math.trunc(Number(input.validDays));
+  if (validDays !== null && (!Number.isFinite(validDays) || validDays < 1 || validDays > 365)) throw new DomainError("VALIDATION", "Validity must be between 1 and 365 days.");
+  if (validDays !== null && validDays < sessions) throw new DomainError("VALIDATION", `A ${sessions}-session package needs at least ${sessions} days of validity.`);
+  const maxDays = Math.min(sessions * 2 + 14, 120, validDays === null ? 120 : validDays - 1);
   try {
     return await tx(async (db) => {
       const ctx = await loadContext(db, actor, input.patientId, input.serviceId);
       const reason = input.reason?.trim().slice(0, 500) || null;
-      const pkg = (await q1<{ id: string; public_ref: string }>(
-        `INSERT INTO patient_package (organization_id, patient_id, public_ref, name, sessions_total, price_paise, note, created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, public_ref`,
-        [actor.organizationId, ctx.patientId, publicRef("PK"), name, sessions, input.pricePaise ?? null, reason, actor.label], db))!;
+      const pkg = (await q1<{ id: string; public_ref: string; valid_until: string | null }>(
+        `INSERT INTO patient_package (organization_id, patient_id, public_ref, name, sessions_total, price_paise, note, created_by, valid_until)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,
+                 CASE WHEN $9::int IS NULL THEN NULL ELSE ($10::timestamptz AT TIME ZONE $11)::date + ($9::int - 1) END)
+         RETURNING id, public_ref, to_char(valid_until,'YYYY-MM-DD') valid_until`,
+        [actor.organizationId, ctx.patientId, publicRef("PK"), name, sessions, input.pricePaise ?? null, reason, actor.label,
+         validDays, new Date(input.startsAt).toISOString(), ctx.svc.timezone], db))!;
 
       // Candidate start instants: same local wall-clock time on each following day.
       const days = await q<{ starts_at: Date; local_day: string; weekday: number; open: boolean }>(
@@ -183,9 +194,9 @@ export async function createPackageBooking(actor: Actor, input: PackageBookingIn
       }
       await audit(db, {
         organizationId: actor.organizationId, actor: actor.label, action: "package.book", targetType: "patient_package", targetId: pkg.id,
-        changes: { name, sessions, booked: booked.length, skipped, source: input.source }, correlationId,
+        changes: { name, sessions, booked: booked.length, skipped, source: input.source, validUntil: pkg.valid_until }, correlationId,
       });
-      return { packageId: pkg.id, reference: pkg.public_ref, booked: booked.length, sessions, skipped, firstAppointmentId: booked[0]?.appointmentId ?? null };
+      return { packageId: pkg.id, reference: pkg.public_ref, booked: booked.length, sessions, skipped, validUntil: pkg.valid_until, firstAppointmentId: booked[0]?.appointmentId ?? null };
     });
   } catch (e) {
     if (pgErrorCode(e) === "23P01") throw new DomainError("SLOT_UNAVAILABLE", "Someone just booked one of those times. Try again.");
@@ -201,5 +212,38 @@ export async function setPackageStatus(actor: Actor, input: { packageId: string;
     if (!pkg) throw new DomainError("NOT_FOUND", "Package not found.");
     await q(`UPDATE patient_package SET status=$2, updated_at=now() WHERE id=$1`, [pkg.id, input.status], db);
     await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: `package.${input.status === "CLOSED" ? "close" : "reopen"}`, targetType: "patient_package", targetId: pkg.id, correlationId });
+  });
+}
+
+/**
+ * Change a package's expiry date (extend it, or remove the expiry with null).
+ * A reason is required and logged. The new date can't fall before a session
+ * that is already booked; cancel or move that session first.
+ */
+export async function setPackageValidity(actor: Actor, input: { packageId: string; validUntil: string | null; reason: string }, correlationId: string) {
+  assertPermission(actor, "APPOINTMENT_ACCEPT");
+  const reason = input.reason.trim();
+  if (reason.length < 3) throw new DomainError("VALIDATION", "Give a reason for changing the validity.", { reason: "Required" });
+  if (input.validUntil !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(input.validUntil) || Number.isNaN(Date.parse(`${input.validUntil}T00:00:00Z`)))) {
+    throw new DomainError("VALIDATION", "Enter a valid date.", { validUntil: "Invalid date" });
+  }
+  if (!/^[0-9a-f-]{36}$/i.test(input.packageId)) throw new DomainError("NOT_FOUND", "Package not found.");
+  return tx(async (db) => {
+    const pkg = await q1<{ id: string; valid_until: string | null }>(
+      `SELECT id, to_char(valid_until,'YYYY-MM-DD') valid_until FROM patient_package WHERE id=$1 AND organization_id=$2 FOR UPDATE`,
+      [input.packageId, actor.organizationId], db);
+    if (!pkg) throw new DomainError("NOT_FOUND", "Package not found.");
+    if (input.validUntil) {
+      const later = await q1<{ day: string }>(
+        `SELECT to_char((a.starts_at AT TIME ZONE b.timezone)::date,'YYYY-MM-DD') AS day
+           FROM appointment a JOIN branch b ON b.id=a.branch_id
+          WHERE a.package_id=$1 AND a.status IN ('CONFIRMED','CHECKED_IN','IN_PROGRESS')
+            AND (a.starts_at AT TIME ZONE b.timezone)::date > $2::date
+          ORDER BY a.starts_at DESC LIMIT 1`, [pkg.id, input.validUntil], db);
+      if (later) throw new DomainError("VALIDATION", `A session is booked on ${later.day}, after that date. Cancel or move it first, or pick a later date.`);
+    }
+    await q(`UPDATE patient_package SET valid_until=$2, updated_at=now() WHERE id=$1`, [pkg.id, input.validUntil], db);
+    await audit(db, { organizationId: actor.organizationId, actor: actor.label, action: "package.validity", targetType: "patient_package", targetId: pkg.id,
+      changes: { validUntil: [pkg.valid_until, input.validUntil] }, reason, correlationId });
   });
 }

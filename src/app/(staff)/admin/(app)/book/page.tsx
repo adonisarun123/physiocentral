@@ -74,7 +74,7 @@ export default async function StaffBookPage({ searchParams }: { searchParams: Pr
       <p className="mb-2 text-sm"><Link href={isPackage ? "/admin/book?mode=package" : "/admin/book"}>← Choose a different patient</Link></p>
       <PageHeader title={pkg ? "Add a package session" : isPackage ? "Book a package" : "New booking"} lead={<>For <Link href={`/admin/patients/${patient.id}`} className="font-semibold">{patient.full_name}</Link>{patient.op_number != null ? <> · <span className="font-mono">{formatOpNumber(patient.op_number)}</span></> : null} · {patient.phone ? displayPhone(patient.phone) : "no phone"}</>} />
       {pkg ? (
-        <div className="mb-4"><Notice>Adding a session to <Link href={`/admin/packages/${pkg.id}`} className="font-semibold">{pkg.name}</Link> ({pkg.done + pkg.upcoming + pkg.no_show} of {pkg.sessions_total} used). It won&apos;t be charged separately.</Notice></div>
+        <div className="mb-4"><Notice>Adding a session to <Link href={`/admin/packages/${pkg.id}`} className="font-semibold">{pkg.name}</Link> ({pkg.done + pkg.upcoming + pkg.no_show} of {pkg.sessions_total} booked{pkg.valid_until ? `, valid until ${pkg.valid_until}` : ""}). It won&apos;t be charged separately.</Notice></div>
       ) : (
         <nav aria-label="Booking type" className="mb-4 flex flex-wrap gap-2">
           <Link href={keep({})} aria-current={!isPackage ? "page" : undefined} className={`btn btn-sm ${!isPackage ? "btn-primary" : "btn-secondary"}`}>Single visit</Link>
@@ -113,6 +113,8 @@ export default async function StaffBookPage({ searchParams }: { searchParams: Pr
                   </select></div>
                 <div><label className="field-label" htmlFor="b-cs">Sessions (custom)</label><input id="b-cs" name="customSessions" type="number" min={1} max={60} className="input w-28" /></div>
                 <div><label className="field-label" htmlFor="b-cp">Price ₹ (custom, optional)</label><input id="b-cp" name="customPrice" inputMode="decimal" className="input w-36" /></div>
+                <div><label className="field-label" htmlFor="b-vd">Valid for (days)</label><input id="b-vd" name="validDays" type="number" min={1} max={365} className="input w-28" aria-describedby="b-vd-h" /></div>
+                <p id="b-vd-h" className="field-hint w-full">Counted from the first session. Leave blank for twice the number of sessions (7 sessions → 14 days). A session is used up when the patient checks in.</p>
               </fieldset>
             ) : null}
             <fieldset><legend className="sr-only">Choose a time</legend>
