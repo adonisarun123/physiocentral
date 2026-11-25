@@ -417,7 +417,86 @@ body {
   .reveal-ready [data-reveal]:not(.is-in) { opacity: 1; transform: none; }
 }
 
+
+/* ───────────────────────── Printed documents ─────────────────────────
+ * Bills, receipts, refund vouchers and exercise sheets. Navy band + the
+ * logo's blue / orange / green. Sized for A4; backgrounds forced on print. */
+.print-shell { --pd-navy: #002552; --pd-blue: #0079f4; --pd-orange: #f06200; --pd-green: #159c11;
+  --pd-ink: #1f1b18; --pd-muted: #5d5650; --pd-line: #e2d9d2; --pd-tint: #f3f7fd; --pd-warm: #fff8f4;
+  color: var(--pd-ink); font-family: var(--font-dm-sans), "DM Sans", system-ui, sans-serif; }
+.pd-doc { display: flex; flex-direction: column; min-height: 100%; font-size: 13.5px; line-height: 1.5; }
+.pd-doc p { margin: 0; }
+.pd-head { margin: 0 0 20px; }
+.pd-band { background: var(--pd-navy); color: #fff; display: flex; align-items: center; gap: 16px; padding: 18px 22px; border-radius: 14px 14px 0 0; }
+.pd-logo { flex: none; width: 66px; height: 66px; border-radius: 14px; background: #fff; display: grid; place-items: center; }
+.pd-logo img { width: 46px; height: 56px; object-fit: contain; }
+.pd-brand { flex: 1; min-width: 0; }
+.pd-name { font-family: var(--font-dm-serif), "DM Serif Display", Georgia, serif; font-size: 27px; line-height: 1.05; }
+.pd-by { font-size: 13.5px; opacity: .9; margin-top: 2px !important; }
+.pd-tag { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: #ffb694; margin-top: 4px !important; }
+.pd-contact { text-align: right; font-size: 11px; line-height: 1.55; max-width: 250px; color: #e7eefc; }
+.pd-stripe { display: grid; grid-template-columns: 1fr 1fr 1fr; height: 5px; }
+.pd-stripe span:nth-child(1) { background: var(--pd-blue); }
+.pd-stripe span:nth-child(2) { background: var(--pd-orange); }
+.pd-stripe span:nth-child(3) { background: var(--pd-green); }
+.pd-titlerow { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
+.pd-title { font-size: 20px; font-weight: 700; color: var(--pd-navy); letter-spacing: .02em; padding-bottom: 4px; border-bottom: 3px solid var(--pd-orange); display: inline-block; }
+.pd-docmeta { color: var(--pd-muted); margin-top: 6px !important; }
+.pd-docmeta strong { color: var(--pd-ink); }
+.pd-stamp { font-size: 11px; font-weight: 700; letter-spacing: .08em; padding: 5px 12px; border-radius: 999px; border: 2px solid; white-space: nowrap; }
+.pd-stamp-paid { color: var(--pd-green); border-color: var(--pd-green); }
+.pd-stamp-part { color: #9a4a00; border-color: var(--pd-orange); }
+.pd-stamp-due { color: #ba1b17; border-color: #ba1b17; }
+.pd-stamp-void { color: #fff; background: #ba1b17; border-color: #ba1b17; }
+.pd-banner { border: 2px solid #ba1b17; color: #ba1b17; font-weight: 700; padding: 8px 12px; border-radius: 10px; margin-bottom: 14px; }
+.pd-banner-info { border-color: var(--pd-orange); color: #7c3000; }
+.pd-meta { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--pd-line); border-radius: 12px; overflow: hidden; }
+.pd-meta > div { padding: 12px 14px; }
+.pd-meta > div + div { border-left: 1px solid var(--pd-line); background: var(--pd-tint); }
+.pd-kv { display: grid; grid-template-columns: 110px 1fr; gap: 3px 10px; align-content: start; margin: 0; }
+.pd-kv dt { color: var(--pd-muted); }
+.pd-kv dd { margin: 0; font-weight: 600; }
+.pd-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-variant-numeric: tabular-nums; }
+.pd-table th { background: var(--pd-tint); color: var(--pd-navy); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; text-align: left; padding: 9px 10px; border-bottom: 2px solid var(--pd-navy); }
+.pd-table td { padding: 9px 10px; border-bottom: 1px solid var(--pd-line); vertical-align: top; }
+.pd-table .num { text-align: right; white-space: nowrap; }
+.pd-table tbody tr { break-inside: avoid; }
+.pd-sum { display: flex; justify-content: space-between; gap: 24px; margin-top: 14px; align-items: flex-start; }
+.pd-words { flex: 1; color: var(--pd-muted); font-size: 12.5px; padding-top: 4px; }
+.pd-words strong { display: block; color: var(--pd-ink); }
+.pd-totals { width: 290px; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.pd-totals td { padding: 6px 10px; }
+.pd-totals td:last-child { text-align: right; white-space: nowrap; }
+.pd-totals .pd-grand td { background: var(--pd-navy); color: #fff; font-weight: 700; font-size: 15px; }
+.pd-totals .pd-paid td { color: var(--pd-green); font-weight: 600; }
+.pd-totals .pd-bal td { color: #ba1b17; font-weight: 700; border-top: 1px solid var(--pd-line); }
+.pd-totals .pd-sub td { color: var(--pd-muted); font-size: 12px; }
+.pd-amount { margin-top: 16px; background: var(--pd-warm); border: 1px solid var(--pd-line); border-left: 6px solid var(--pd-orange); border-radius: 12px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.pd-amount .pd-big { font-size: 26px; font-weight: 700; color: var(--pd-navy); white-space: nowrap; }
+.pd-section { margin-top: 18px; }
+.pd-section h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--pd-navy); margin: 0 0 6px; }
+.pd-note { margin-top: 14px; font-size: 11.5px; color: var(--pd-muted); }
+.pd-sign { display: flex; justify-content: space-between; align-items: flex-end; gap: 24px; margin-top: auto; padding-top: 36px; }
+.pd-thanks { color: var(--pd-navy); font-size: 12.5px; max-width: 360px; }
+.pd-signbox { text-align: center; font-size: 11px; color: var(--pd-muted); width: 210px; }
+.pd-signline { display: block; border-top: 1px solid var(--pd-ink); margin: 38px 0 4px; }
+.pd-foot { display: flex; justify-content: space-between; gap: 12px; margin-top: 18px; padding-top: 8px; border-top: 3px solid var(--pd-navy); font-size: 10.5px; color: var(--pd-muted); }
+@media (max-width: 640px) {
+  .pd-band { flex-wrap: wrap; }
+  .pd-contact { text-align: left; max-width: none; width: 100%; }
+  .pd-meta { grid-template-columns: 1fr; }
+  .pd-meta > div + div { border-left: 0; border-top: 1px solid var(--pd-line); }
+  .pd-sum { flex-direction: column; }
+  .pd-totals { width: 100%; }
+}
+
 @media print {
   .no-print { display: none !important; }
   body { background: #fff; }
+}
+@page { size: A4; margin: 12mm; }
+@media print {
+  .print-shell { padding: 0 !important; max-width: none !important; }
+  .print-shell, .print-shell * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .pd-doc { min-height: calc(297mm - 24mm - 2px); }
 }

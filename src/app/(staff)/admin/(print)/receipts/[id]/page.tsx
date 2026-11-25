@@ -3,13 +3,17 @@ import type { Metadata } from "next";
 import { q1 } from "@/lib/db";
 import { requireStaff } from "@/modules/auth/session";
 import { formatINR } from "@/modules/billing/money";
+import { amountInWords } from "@/modules/billing/words";
 import { formatDate } from "@/lib/format";
 import { PrintButton } from "../../print-button";
+import { DocTitle, getClinicContact, Letterhead, PrintFooter, Signature } from "../../letterhead";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Receipt" };
 
 type Snap = { number: string; issuedAt: string; clinic: string; receivedFrom: string; patientRef: string; method: string; reference: string | null; receivedOn: string; amountPaise: string; allocationsAtIssue: { invoice_number: string; amount_paise: string }[] };
+
+const methodLabel = (m: string) => ({ CASH: "Cash", UPI_MANUAL: "UPI", UPI: "UPI", BANK_TRANSFER: "Bank transfer", CARD: "Card", GATEWAY: "Online" }[m] ?? m.replace(/_/g, " ").toLowerCase());
 
 export default async function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
   const actor = await requireStaff();
@@ -21,26 +25,53 @@ export default async function ReceiptPage({ params }: { params: Promise<{ id: st
       WHERE r.id=$1 AND r.organization_id=$2`, [id, actor.organizationId]);
   if (!r) notFound();
   const s = r.snapshot;
+  const live = await getClinicContact(actor.organizationId);
+  const clinic = { ...live, name: s.clinic || live.name };
+  const reversed = r.status === "REVERSED";
+  const allocated = s.allocationsAtIssue.reduce((t, a) => t + BigInt(a.amount_paise), 0n);
+  const credit = BigInt(s.amountPaise) - allocated;
+
   return (
-    <article>
-      <div className="mb-6 flex justify-end"><PrintButton /></div>
-      <header className="border-b-2 border-[var(--color-ink)] pb-3">
-        <p className="text-xl font-extrabold">{s.clinic}</p>
-        <h1 className="text-2xl font-bold">Payment receipt</h1>
-        <p>No. <strong>{s.number}</strong> · {formatDate(s.issuedAt)}</p>
-      </header>
-      {r.status === "REVERSED" ? <p className="mt-3 border-2 border-[var(--color-ink)] p-2 font-bold">CANCELLED — this payment entry was reversed. This receipt is no longer valid.</p> : null}
-      {r.status !== "REVERSED" && r.refunded !== "0" ? <p className="mt-3 border-2 border-[var(--color-ink)] p-2 font-bold">{formatINR(r.refunded)} of this payment has since been refunded.</p> : null}
-      <dl className="mt-4 space-y-1">
-        <div><dt className="inline font-semibold">Received from: </dt><dd className="inline">{s.receivedFrom} (ref {s.patientRef})</dd></div>
-        <div><dt className="inline font-semibold">Amount: </dt><dd className="inline text-lg font-bold">{formatINR(s.amountPaise)}</dd></div>
-        <div><dt className="inline font-semibold">Method: </dt><dd className="inline">{s.method.replace("_", " ").toLowerCase()}{s.reference ? ` — ${s.reference}` : ""}</dd></div>
-        <div><dt className="inline font-semibold">Date received: </dt><dd className="inline">{s.receivedOn}</dd></div>
-      </dl>
-      <h2 className="mt-6 font-bold">Applied to</h2>
-      {s.allocationsAtIssue.length === 0 ? <p>Held as account credit at time of receipt.</p> : (
-        <ul>{s.allocationsAtIssue.map((a, i) => <li key={i}>{a.invoice_number}: {formatINR(a.amount_paise)}</li>)}</ul>
-      )}
+    <article className="pd-doc">
+      <div className="no-print mb-6 flex justify-end"><PrintButton /></div>
+      {reversed ? <p className="pd-banner">CANCELLED — this payment entry was reversed. This receipt is no longer valid.</p> : null}
+      {!reversed && r.refunded !== "0" ? <p className="pd-banner pd-banner-info">{formatINR(r.refunded)} of this payment has since been refunded (see the refund voucher).</p> : null}
+      <Letterhead clinic={clinic} />
+      <DocTitle title="Payment Receipt" number={s.number} date={formatDate(s.issuedAt)}
+        stamp={reversed ? { text: "CANCELLED", tone: "void" } : { text: "RECEIVED", tone: "paid" }} />
+
+      <section className="pd-meta">
+        <dl className="pd-kv">
+          <dt>Received from</dt><dd>{s.receivedFrom}</dd>
+          <dt>Patient no.</dt><dd>{s.patientRef}</dd>
+        </dl>
+        <dl className="pd-kv">
+          <dt>Date received</dt><dd>{formatDate(s.receivedOn)}</dd>
+          <dt>Payment mode</dt><dd>{methodLabel(s.method)}</dd>
+          {s.reference ? <><dt>Reference</dt><dd>{s.reference}</dd></> : null}
+        </dl>
+      </section>
+
+      <div className="pd-amount">
+        <p className="pd-words">Amount received<strong>{amountInWords(s.amountPaise)}</strong></p>
+        <p className="pd-big">{formatINR(s.amountPaise)}</p>
+      </div>
+
+      <section className="pd-section">
+        <h2>Applied to</h2>
+        {s.allocationsAtIssue.length === 0 ? <p>Held as account credit at the time of receipt.</p> : (
+          <table className="pd-table" style={{ marginTop: 0 }}>
+            <thead><tr><th style={{ width: 32 }}>#</th><th>Bill no.</th><th className="num">Amount applied</th></tr></thead>
+            <tbody>
+              {s.allocationsAtIssue.map((a, i) => <tr key={i}><td>{i + 1}</td><td>{a.invoice_number}</td><td className="num">{formatINR(a.amount_paise)}</td></tr>)}
+              {credit > 0n ? <tr><td>{s.allocationsAtIssue.length + 1}</td><td>Held as account credit</td><td className="num">{formatINR(credit)}</td></tr> : null}
+            </tbody>
+          </table>
+        )}
+      </section>
+
+      <Signature clinicName={clinic.name} />
+      <PrintFooter clinic={clinic} />
     </article>
   );
 }
