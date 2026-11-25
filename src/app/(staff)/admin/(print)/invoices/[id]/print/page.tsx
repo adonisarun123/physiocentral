@@ -3,11 +3,13 @@ import type { Metadata } from "next";
 import { q1 } from "@/lib/db";
 import { requireStaff } from "@/modules/auth/session";
 import { formatINR } from "@/modules/billing/money";
+import { amountInWords } from "@/modules/billing/words";
 import { formatDate } from "@/lib/format";
 import { PrintButton } from "../../../print-button";
+import { DocTitle, getClinicContact, Letterhead, PrintFooter, Signature } from "../../../letterhead";
 
 export const dynamic = "force-dynamic";
-export const metadata: Metadata = { title: "Invoice" };
+export const metadata: Metadata = { title: "Bill" };
 
 type Snapshot = {
   documentType: string; number: string; issuedAt: string;
@@ -21,53 +23,95 @@ type Snapshot = {
 };
 
 const TITLE: Record<string, string> = { BILL: "Bill", BILL_OF_SUPPLY: "Bill of Supply", TAX_INVOICE: "Tax Invoice" };
+const qty = (q: string, unit: string) => `${q.replace(/\.?0+$/, "")} ${unit.toLowerCase()}`;
 
 /** Rendered only from the immutable issue snapshot, so reprints reproduce the same data (§9.2). */
 export default async function InvoicePrint({ params }: { params: Promise<{ id: string }> }) {
   const actor = await requireStaff();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const row = await q1<{ snapshot: Snapshot | null; status: string }>(`SELECT snapshot, status FROM invoice WHERE id=$1 AND organization_id=$2`, [id, actor.organizationId]);
+  const row = await q1<{ snapshot: Snapshot | null; status: string; due_now: string | null }>(
+    `SELECT i.snapshot, i.status, b.amount_due_paise::text AS due_now
+       FROM invoice i LEFT JOIN invoice_balance b ON b.invoice_id=i.id
+      WHERE i.id=$1 AND i.organization_id=$2`, [id, actor.organizationId]);
   if (!row?.snapshot || row.status === "DRAFT") notFound();
   const s = row.snapshot;
+  const live = await getClinicContact(actor.organizationId);
+  // Letterhead: the supplier identity on the snapshot wins; contact gaps are filled from the clinic's current details.
+  const clinic = {
+    name: s.supplier.tradeName || live.name,
+    address: s.supplier.branch?.address || live.address,
+    phone: s.supplier.branch?.phone ?? s.supplier.phone ?? live.phone,
+    email: s.supplier.email ?? live.email,
+  };
+
+  const total = BigInt(s.totals.totalPaise);
+  const dueNow = row.due_now === null ? null : BigInt(row.due_now);
+  const voided = row.status === "VOIDED";
+  const stamp = voided ? { text: "VOID", tone: "void" as const }
+    : total === 0n || dueNow === null ? null
+    : dueNow <= 0n ? { text: "PAID", tone: "paid" as const }
+    : dueNow < total ? { text: "PART PAID", tone: "part" as const }
+    : { text: "PAYMENT DUE", tone: "due" as const };
+  const hasDiscount = s.lines.some((l) => l.discount_paise !== "0");
+  const hasTax = s.lines.some((l) => l.tax_paise !== "0") || s.totals.taxPaise !== "0";
+  const statusChanged = !voided && dueNow !== null && dueNow.toString() !== s.asOfIssue.balanceDuePaise;
+
   return (
-    <article>
-      <div className="mb-6 flex justify-end"><PrintButton /></div>
-      {!s.supplier.identityVerified ? <p className="mb-4 border-2 border-[var(--color-danger)] p-2 text-center font-bold text-[var(--color-danger)]">SPECIMEN — clinic legal identity not yet verified</p> : null}
-      <header className="flex flex-wrap justify-between gap-4 border-b-2 border-[var(--color-ink)] pb-4">
-        <div>
-          <p className="text-xl font-extrabold">{s.supplier.tradeName}</p>
-          {s.supplier.legalName ? <p>{s.supplier.legalName}</p> : null}
-          {s.supplier.branch ? <p>{s.supplier.branch.address || s.supplier.branch.name}</p> : null}
-          {s.supplier.phone || s.supplier.branch?.phone ? <p>{s.supplier.branch?.phone ?? s.supplier.phone}</p> : null}
-          {s.supplier.gstin ? <p>GSTIN: {s.supplier.gstin}</p> : null}
-        </div>
-        <div className="text-right">
-          <h1 className="text-2xl font-bold">{TITLE[s.documentType] ?? "Bill"}</h1>
-          <p>No. <strong>{s.number}</strong></p>
-          <p>Date: {formatDate(s.issuedAt)}</p>
-        </div>
-      </header>
-      <section className="mt-4 grid gap-2 sm:grid-cols-2">
-        <div><p className="font-semibold">Billed to</p><p>{s.billTo.name}</p><p className="text-sm">Patient ref {s.billTo.patientRef}</p></div>
-        {s.service ? <div><p className="font-semibold">Service date</p><p>{formatDate(s.service.date)}</p><p className="text-sm">Appointment {s.service.appointmentRef}</p></div> : null}
+    <article className="pd-doc">
+      <div className="no-print mb-6 flex justify-end"><PrintButton /></div>
+      {!s.supplier.identityVerified ? <p className="pd-banner">SPECIMEN — clinic legal identity not yet verified</p> : null}
+      {voided ? <p className="pd-banner">VOID — this bill was cancelled and is no longer payable.</p> : null}
+      <Letterhead clinic={clinic} extra={s.supplier.gstin ? <p>GSTIN {s.supplier.gstin}</p> : null} />
+      <DocTitle title={TITLE[s.documentType] ?? "Bill"} number={s.number} date={formatDate(s.issuedAt)} stamp={stamp} />
+
+      <section className="pd-meta">
+        <dl className="pd-kv">
+          <dt>Billed to</dt><dd>{s.billTo.name}</dd>
+          <dt>Patient no.</dt><dd>{s.billTo.patientRef}</dd>
+        </dl>
+        <dl className="pd-kv">
+          <dt>Bill date</dt><dd>{formatDate(s.issuedAt)}</dd>
+          {s.service ? <><dt>Visit date</dt><dd>{formatDate(s.service.date)}</dd><dt>Appointment</dt><dd>{s.service.appointmentRef}</dd></> : null}
+          {s.supplier.legalName ? <><dt>Billed by</dt><dd>{s.supplier.legalName}</dd></> : null}
+        </dl>
       </section>
-      <table className="data mt-6">
-        <thead><tr><th>Description</th><th className="num">Qty</th><th className="num">Rate</th><th className="num">Discount</th><th className="num">Tax</th><th className="num">Amount</th></tr></thead>
+
+      <table className="pd-table">
+        <thead><tr>
+          <th style={{ width: 32 }}>#</th><th>Description</th><th className="num">Qty</th><th className="num">Rate</th>
+          {hasDiscount ? <th className="num">Discount</th> : null}{hasTax ? <th className="num">Tax</th> : null}<th className="num">Amount</th>
+        </tr></thead>
         <tbody>{s.lines.map((l, i) => (
-          <tr key={i}><td>{l.description}</td><td className="num">{l.quantity.replace(/\.?0+$/, "")} {l.billing_unit.toLowerCase()}</td><td className="num">{formatINR(l.unit_price_paise)}</td>
-            <td className="num">{formatINR(l.discount_paise)}</td><td className="num">{formatINR(l.tax_paise)}</td><td className="num">{formatINR(l.total_paise)}</td></tr>
+          <tr key={i}>
+            <td>{i + 1}</td><td>{l.description}</td><td className="num">{qty(l.quantity, l.billing_unit)}</td><td className="num">{formatINR(l.unit_price_paise)}</td>
+            {hasDiscount ? <td className="num">{l.discount_paise === "0" ? "—" : `− ${formatINR(l.discount_paise)}`}</td> : null}
+            {hasTax ? <td className="num">{formatINR(l.tax_paise)}</td> : null}
+            <td className="num">{formatINR(l.total_paise)}</td>
+          </tr>
         ))}</tbody>
-        <tfoot>
-          <tr><th colSpan={5}>Subtotal</th><td className="num">{formatINR(s.totals.subtotalPaise)}</td></tr>
-          <tr><th colSpan={5}>Tax</th><td className="num">{formatINR(s.totals.taxPaise)}</td></tr>
-          <tr><th colSpan={5}>Total (INR)</th><td className="num font-bold">{formatINR(s.totals.totalPaise)}</td></tr>
-          <tr><th colSpan={5}>Payments applied (as of issue)</th><td className="num">{formatINR(s.asOfIssue.paymentsAppliedPaise)}</td></tr>
-          <tr><th colSpan={5}>Balance due (as of issue)</th><td className="num font-bold">{formatINR(s.asOfIssue.balanceDuePaise)}</td></tr>
-        </tfoot>
       </table>
-      <p className="mt-6 text-sm">Later payments are shown on receipts and account statements; this original document is not altered.</p>
-      <p className="mt-2 text-xs text-[var(--color-ink-muted)]">Rounding: {s.roundingPolicy}. Template {s.rendererVersion}.</p>
+
+      <div className="pd-sum">
+        <p className="pd-words">Amount in words<strong>{amountInWords(total)}</strong></p>
+        <table className="pd-totals"><tbody>
+          <tr className="pd-sub"><td>Sub total</td><td>{formatINR(s.totals.subtotalPaise)}</td></tr>
+          {hasTax ? <tr className="pd-sub"><td>Tax</td><td>{formatINR(s.totals.taxPaise)}</td></tr> : null}
+          <tr className="pd-grand"><td>Total (INR)</td><td>{formatINR(s.totals.totalPaise)}</td></tr>
+          <tr className="pd-paid"><td>Paid at billing</td><td>{formatINR(s.asOfIssue.paymentsAppliedPaise)}</td></tr>
+          <tr className="pd-bal"><td>Balance at billing</td><td>{formatINR(s.asOfIssue.balanceDuePaise)}</td></tr>
+        </tbody></table>
+      </div>
+
+      {statusChanged && dueNow !== null ? (
+        <p className="pd-banner pd-banner-info mt-4">
+          {dueNow <= 0n ? "Status today: paid in full." : `Status today: ${formatINR(dueNow)} outstanding.`} Later payments are listed on their own receipts.
+        </p>
+      ) : null}
+
+      <p className="pd-note">This original bill is never altered; later payments appear on receipts and account statements. Rounding: {s.roundingPolicy}. Template {s.rendererVersion}.</p>
+      <Signature clinicName={clinic.name} />
+      <PrintFooter clinic={clinic} />
     </article>
   );
 }

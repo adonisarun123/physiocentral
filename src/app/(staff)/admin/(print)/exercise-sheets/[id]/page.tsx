@@ -5,6 +5,7 @@ import { DomainError } from "@/lib/errors";
 import { displayPhone, formatDate, patientNumber } from "@/lib/format";
 import { dosageLine, getHomeProgramme } from "@/modules/clinical/exercises";
 import { PrintButton } from "../../print-button";
+import { DocTitle, Letterhead, PrintFooter } from "../../letterhead";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Home exercise sheet" };
@@ -21,18 +22,15 @@ export default async function ExerciseSheetPage({ params }: { params: Promise<{ 
     throw e;
   }
   return (
-    <article>
+    <article className="pd-doc">
       <div className="no-print mb-6 flex flex-wrap items-center justify-between gap-3">
         <a href={`/admin/chart/${h.patient.id}`}>← Clinical record</a>
         <PrintButton />
       </div>
       {h.status === "STOPPED" ? <p className="mb-4 border-2 border-[var(--color-ink)] p-2 font-bold">This sheet has been stopped. Follow your most recent sheet.</p> : null}
-      <header className="border-b-2 border-[var(--color-ink)] pb-3">
-        <p className="text-xl font-extrabold">{h.clinic.name}</p>
-        {h.clinic.address || h.clinic.phone ? <p className="text-sm">{[h.clinic.address, h.clinic.phone ? displayPhone(h.clinic.phone) : null].filter(Boolean).join(" · ")}</p> : null}
-        <h1 className="mt-2 text-2xl font-bold">{h.title}</h1>
-        <p>For <strong>{h.patient.full_name}</strong> ({patientNumber(h.patient)}) · given {formatDate(h.created_at)} by {h.author_name}</p>
-      </header>
+      <Letterhead clinic={{ name: h.clinic.name, address: h.clinic.address, phone: h.clinic.phone, email: null }} />
+      <DocTitle title={h.title} date={`Given ${formatDate(h.created_at)} by ${h.author_name}`} />
+      <p className="mb-2">For <strong>{h.patient.full_name}</strong> ({patientNumber(h.patient)})</p>
       <ol className="mt-4 space-y-4">
         {h.items.map((i) => (
           <li key={i.position} className="break-inside-avoid border-b border-[var(--color-line)] pb-3">
@@ -47,6 +45,7 @@ export default async function ExerciseSheetPage({ params }: { params: Promise<{ 
       {/* Wording approved by Dr Nitin N Sunku (clinic head), Nov 2026: shown on every sheet in his name. */}
       <p className="mt-6 text-sm">If an exercise causes pain that doesn&apos;t settle, stop it and contact the clinic{h.clinic.phone ? ` on ${displayPhone(h.clinic.phone)}` : ""}.
         <span className="mt-1 block font-semibold">— Dr Nitin N Sunku</span></p>
+      <PrintFooter clinic={{ name: h.clinic.name, address: h.clinic.address, phone: h.clinic.phone, email: null }} note="Home exercise programme — keep this sheet with you." />
     </article>
   );
 }
