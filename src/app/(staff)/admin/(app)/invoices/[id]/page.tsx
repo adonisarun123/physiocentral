@@ -6,9 +6,9 @@ import { requireStaff } from "@/modules/auth/session";
 import { can } from "@/modules/auth/actor";
 import { PageHeader, StatusBadge, Notice } from "@/components/ui";
 import { ActionForm, SubmitButton } from "@/components/action-form";
-import { computeBalance, formatINR } from "@/modules/billing/money";
+import { computeBalance, formatINR, formatPercentBp } from "@/modules/billing/money";
 import { formatDate, formatDateTime, todayInZone } from "@/lib/format";
-import { allocateAction, discardInvoiceAction, issueInvoiceAction, recordPaymentAction, verifyPaymentAction } from "../../../actions";
+import { allocateAction, billDiscountAction, discardInvoiceAction, issueInvoiceAction, recordPaymentAction, verifyPaymentAction } from "../../../actions";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Invoice" };
@@ -17,7 +17,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
   const actor = await requireStaff();
   const { id } = await params;
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
-  const inv = await q1<{ id: string; number: string | null; status: string; version: number; patient_id: string; appointment_id: string | null; subtotal_paise: string; tax_paise: string; total_paise: string; issued_at: Date | null; document_type: string; patient: string }>(
+  const inv = await q1<{ id: string; number: string | null; status: string; version: number; patient_id: string; appointment_id: string | null; subtotal_paise: string; tax_paise: string; total_paise: string; issued_at: Date | null; document_type: string; patient: string;
+    bill_discount_type: string | null; bill_discount_bp: number | null; bill_discount_paise: string; bill_discount_reason: string | null; bill_discount_by: string | null }>(
     `SELECT i.*, p.full_name patient FROM invoice i JOIN patient p ON p.id=i.patient_id WHERE i.id=$1 AND i.organization_id=$2`,
     [id, actor.organizationId],
   );
@@ -37,6 +38,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       `SELECT c.number, c.amount_paise, c.reason, c.created_by_name, c.created_at, c.refund_id, rf.number refund_number
          FROM credit_note c LEFT JOIN payment_refund rf ON rf.id=c.refund_id WHERE c.invoice_id=$1 ORDER BY c.created_at`, [id]),
   ]);
+  const discountTotal = lines.reduce((a, l) => a + BigInt(l.discount_paise), 0n);
+  const billDiscountLabel = inv.bill_discount_type === "PERCENT" && inv.bill_discount_bp !== null
+    ? `${formatPercentBp(inv.bill_discount_bp)} off the bill (${formatINR(inv.bill_discount_paise)})`
+    : inv.bill_discount_type === "AMOUNT" ? `${formatINR(inv.bill_discount_paise)} off the bill` : null;
   const balance = inv.status === "ISSUED" ? computeBalance(BigInt(bal?.net_liability_paise ?? inv.total_paise), BigInt(bal?.net_allocated_paise ?? "0")) : null;
 
   return (
@@ -59,6 +64,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
               ))}
             </tbody>
             <tfoot>
+              {discountTotal > 0n ? <tr><th colSpan={5}>Total discount given{billDiscountLabel ? ` (includes ${billDiscountLabel})` : ""}</th><td className="num">−{formatINR(discountTotal)}</td></tr> : null}
               <tr><th colSpan={5}>Subtotal</th><td className="num">{formatINR(inv.subtotal_paise)}</td></tr>
               <tr><th colSpan={5}>Tax</th><td className="num">{formatINR(inv.tax_paise)}</td></tr>
               <tr><th colSpan={5}>Total</th><td className="num font-bold">{formatINR(inv.total_paise)}</td></tr>
@@ -70,6 +76,32 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             </tfoot>
           </table>
         </div>
+        {inv.status === "DRAFT" && can(actor, "INVOICE_DRAFT") ? (
+          <div className="mt-4 rounded border border-[var(--color-line)] p-3">
+            <h2 className="font-bold">Discount on the whole bill</h2>
+            {billDiscountLabel ? (
+              <div className="mt-1 flex flex-wrap items-center gap-3 text-sm">
+                <span>Applied: <strong>{billDiscountLabel}</strong> · {inv.bill_discount_reason} · by {inv.bill_discount_by}</span>
+                <ActionForm action={billDiscountAction}>
+                  <input type="hidden" name="id" value={inv.id} /><input type="hidden" name="version" value={inv.version} /><input type="hidden" name="type" value="NONE" />
+                  <SubmitButton small variant="danger">Remove discount</SubmitButton>
+                </ActionForm>
+              </div>
+            ) : <p className="mt-1 text-sm text-[var(--color-ink-muted)]">Give the patient a percentage or a rupee amount off. It is shared across the lines and shown on the printed bill.</p>}
+            <ActionForm action={billDiscountAction} className="mt-3 flex flex-wrap items-end gap-3">
+              <input type="hidden" name="id" value={inv.id} /><input type="hidden" name="version" value={inv.version} />
+              <div><label className="field-label" htmlFor="discType">Discount as</label>
+                <select id="discType" name="type" className="input" defaultValue={inv.bill_discount_type ?? "PERCENT"}><option value="PERCENT">Percentage (%)</option><option value="AMOUNT">Amount (₹)</option></select></div>
+              <div><label className="field-label" htmlFor="discValue">Value</label>
+                <input id="discValue" name="value" required className="input w-28" inputMode="decimal" placeholder="e.g. 10"
+                  defaultValue={inv.bill_discount_type === "PERCENT" && inv.bill_discount_bp !== null ? formatPercentBp(inv.bill_discount_bp).replace("%", "") : inv.bill_discount_type === "AMOUNT" ? (Number(inv.bill_discount_paise) / 100).toFixed(2) : undefined} /></div>
+              <div className="min-w-64 flex-1"><label className="field-label" htmlFor="discReason">Reason (kept in the audit history, not printed)</label>
+                <input id="discReason" name="reason" required maxLength={300} className="input" placeholder="e.g. Senior citizen, staff family, package offer" defaultValue={inv.bill_discount_reason ?? undefined} /></div>
+              <SubmitButton>{billDiscountLabel ? "Update discount" : "Apply discount"}</SubmitButton>
+            </ActionForm>
+            <p className="field-hint mt-2">Applying again replaces the earlier bill discount. Line discounts entered when the bill was created stay as they are.</p>
+          </div>
+        ) : null}
         {inv.status === "DRAFT" ? (
           <div className="mt-4 flex flex-wrap gap-3">
             {can(actor, "INVOICE_ISSUE") ? (

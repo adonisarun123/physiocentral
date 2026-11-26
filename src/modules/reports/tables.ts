@@ -14,7 +14,7 @@ export type Table = {
 
 type DayIn = {
   day: string; completed: number; no_show: number; cancelled: number; new_patients: number;
-  billed_paise: string; credited_paise: string; cash_paise: string; upi_paise: string; other_paise: string;
+  billed_paise: string; discount_paise: string; credited_paise: string; cash_paise: string; upi_paise: string; other_paise: string;
   collected_paise: string; refunded_paise: string; net_paise: string; expenses_paise: string; profit_paise: string;
 };
 type TherapistIn = { therapist: string; completed: number; no_show: number; cancelled: number; patients: number; billed_paise: string };
@@ -28,17 +28,17 @@ const sumInt = <T>(rows: T[], f: (r: T) => number) => rows.reduce((a, r) => a + 
 const sumPaise = <T>(rows: T[], f: (r: T) => string) => rows.reduce((a, r) => a + BigInt(f(r)), 0n).toString();
 
 export function dayTable(rows: DayIn[], money: Money): Table {
-  const header = ["Date", "Visits done", "No-shows", "Cancelled", "New patients", "Billed", "Credit notes", "Cash", "UPI", "Bank / other", "Collected", "Refunded", "Net collected", "Expenses", "Profit"];
+  const header = ["Date", "Visits done", "No-shows", "Cancelled", "New patients", "Billed", "Discounts given", "Credit notes", "Cash", "UPI", "Bank / other", "Collected", "Refunded", "Net collected", "Expenses", "Profit"];
   const cells = (r: DayIn) => [
     String(r.completed), String(r.no_show), String(r.cancelled), String(r.new_patients),
-    money(r.billed_paise), money(r.credited_paise), money(r.cash_paise), money(r.upi_paise), money(r.other_paise),
+    money(r.billed_paise), money(r.discount_paise), money(r.credited_paise), money(r.cash_paise), money(r.upi_paise), money(r.other_paise),
     money(r.collected_paise), money(r.refunded_paise), money(r.net_paise), money(r.expenses_paise), money(r.profit_paise),
   ];
   const total: DayIn = {
     day: "Total",
     completed: sumInt(rows, (r) => r.completed), no_show: sumInt(rows, (r) => r.no_show), cancelled: sumInt(rows, (r) => r.cancelled),
     new_patients: sumInt(rows, (r) => r.new_patients),
-    billed_paise: sumPaise(rows, (r) => r.billed_paise), credited_paise: sumPaise(rows, (r) => r.credited_paise),
+    billed_paise: sumPaise(rows, (r) => r.billed_paise), discount_paise: sumPaise(rows, (r) => r.discount_paise), credited_paise: sumPaise(rows, (r) => r.credited_paise),
     cash_paise: sumPaise(rows, (r) => r.cash_paise), upi_paise: sumPaise(rows, (r) => r.upi_paise), other_paise: sumPaise(rows, (r) => r.other_paise),
     collected_paise: sumPaise(rows, (r) => r.collected_paise), refunded_paise: sumPaise(rows, (r) => r.refunded_paise), net_paise: sumPaise(rows, (r) => r.net_paise),
     expenses_paise: sumPaise(rows, (r) => r.expenses_paise), profit_paise: sumPaise(rows, (r) => r.profit_paise),

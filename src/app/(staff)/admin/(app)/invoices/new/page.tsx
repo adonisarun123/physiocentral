@@ -44,7 +44,7 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
           <input type="hidden" name="patientId" value={p.id} /><input type="hidden" name="lineCount" value={ROWS} />
           <div className="table-region" role="region" aria-label="Invoice lines" tabIndex={0}>
             <table className="data">
-              <thead><tr><th>Service (or leave blank)</th><th>Description</th><th>Qty</th><th>Price each (₹)</th><th>Discount (₹)</th></tr></thead>
+              <thead><tr><th>Service (or leave blank)</th><th>Description</th><th>Qty</th><th>Price each (₹)</th><th>Discount</th></tr></thead>
               <tbody>
                 {Array.from({ length: ROWS }, (_, i) => (
                   <tr key={i}>
@@ -52,13 +52,16 @@ export default async function NewInvoicePage({ searchParams }: { searchParams: P
                     <td><input aria-label={`Line ${i + 1} description`} name={`l${i}desc`} defaultValue={i === 0 ? preDesc : undefined} className="input min-w-52" placeholder={i === 0 ? "e.g. 10-session package, knee brace" : ""} /></td>
                     <td><input aria-label={`Line ${i + 1} quantity`} name={`l${i}qty`} className="input w-20" inputMode="decimal" placeholder="1" /></td>
                     <td><input aria-label={`Line ${i + 1} price`} name={`l${i}price`} defaultValue={i === 0 ? prePrice : undefined} className="input w-32" inputMode="decimal" placeholder={i === 0 ? "catalog price" : ""} /></td>
-                    <td><input aria-label={`Line ${i + 1} discount`} name={`l${i}disc`} className="input w-28" inputMode="decimal" /></td>
+                    <td><div className="flex gap-1">
+                      <input aria-label={`Line ${i + 1} discount`} name={`l${i}disc`} className="input w-24" inputMode="decimal" />
+                      <select aria-label={`Line ${i + 1} discount in`} name={`l${i}discType`} className="input w-16" defaultValue="AMOUNT"><option value="AMOUNT">₹</option><option value="PERCENT">%</option></select>
+                    </div></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="field-hint mt-2">Pick a service to use its catalog price, or type a description and price for anything else. Blank rows are ignored. The discount is the rupee amount off the whole line.</p>
+          <p className="field-hint mt-2">Pick a service to use its catalog price, or type a description and price for anything else. Blank rows are ignored. A line discount can be a rupee amount (₹) or a percentage (%) of that line. To discount the whole bill, apply it on the draft in the next step.</p>
           <div className="mt-3"><SubmitButton>Create draft invoice</SubmitButton></div>
           <p className="mt-2 text-sm text-[var(--color-ink-muted)]">You&apos;ll review the draft, then issue it to get an invoice number.</p>
         </ActionForm>
