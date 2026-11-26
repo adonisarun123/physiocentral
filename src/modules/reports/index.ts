@@ -10,6 +10,7 @@ import type { ReportView } from "./range";
  *
  * Definitions (all dates are IST calendar days):
  * - Visits: appointments by their start date. Completed / no-show / cancelled.
+ * - Discounts: discounts given on those same issued bills (line + whole-bill), by issue date.
  * - Billed: ISSUED invoices by issue date (voided bills excluded). Credit notes
  *   are shown separately on the day they were raised.
  * - Collected: VERIFIED payments by the date received. Pending, failed and
@@ -24,7 +25,7 @@ const TZ = "Asia/Kolkata";
 
 export type DayRow = {
   day: string; completed: number; no_show: number; cancelled: number; new_patients: number;
-  billed_paise: string; credited_paise: string;
+  billed_paise: string; discount_paise: string; credited_paise: string;
   cash_paise: string; upi_paise: string; other_paise: string; collected_paise: string;
   refunded_paise: string; net_paise: string; expenses_paise: string; profit_paise: string;
 };
@@ -50,6 +51,10 @@ export async function dayWise(actor: StaffActor, from: string, to: string): Prom
      billed AS (
        SELECT (i.issued_at AT TIME ZONE '${TZ}')::date AS day, sum(i.total_paise) AS amt
          FROM invoice i WHERE i.organization_id = $1 AND i.status = 'ISSUED' GROUP BY 1),
+     discounted AS (
+       SELECT (i.issued_at AT TIME ZONE '${TZ}')::date AS day, sum(l.discount_paise) AS amt
+         FROM invoice i JOIN invoice_line l ON l.invoice_id = i.id
+        WHERE i.organization_id = $1 AND i.status = 'ISSUED' GROUP BY 1),
      credited AS (
        SELECT (c.created_at AT TIME ZONE '${TZ}')::date AS day, sum(c.amount_paise) AS amt
          FROM credit_note c WHERE c.organization_id = $1 GROUP BY 1),
@@ -72,7 +77,7 @@ export async function dayWise(actor: StaffActor, from: string, to: string): Prom
      SELECT to_char(d.day, 'YYYY-MM-DD') AS day,
             COALESCE(v.completed, 0) AS completed, COALESCE(v.no_show, 0) AS no_show, COALESCE(v.cancelled, 0) AS cancelled,
             COALESCE(n.n, 0) AS new_patients,
-            COALESCE(b.amt, 0)::text AS billed_paise, COALESCE(c.amt, 0)::text AS credited_paise,
+            COALESCE(b.amt, 0)::text AS billed_paise, COALESCE(dc.amt, 0)::text AS discount_paise, COALESCE(c.amt, 0)::text AS credited_paise,
             COALESCE(p.cash, 0)::text AS cash_paise, COALESCE(p.upi, 0)::text AS upi_paise, COALESCE(p.other, 0)::text AS other_paise,
             COALESCE(p.total, 0)::text AS collected_paise, COALESCE(r.amt, 0)::text AS refunded_paise,
             (COALESCE(p.total, 0) - COALESCE(r.amt, 0))::text AS net_paise,
@@ -81,6 +86,7 @@ export async function dayWise(actor: StaffActor, from: string, to: string): Prom
        FROM days d
        LEFT JOIN visits v ON v.day = d.day LEFT JOIN newp n ON n.day = d.day
        LEFT JOIN billed b ON b.day = d.day LEFT JOIN credited c ON c.day = d.day
+       LEFT JOIN discounted dc ON dc.day = d.day
        LEFT JOIN paid p ON p.day = d.day LEFT JOIN refunded r ON r.day = d.day
        LEFT JOIN spent x ON x.day = d.day
       ORDER BY d.day DESC`,

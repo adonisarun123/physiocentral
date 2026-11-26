@@ -16,8 +16,10 @@ type Snapshot = {
   supplier: { tradeName: string; legalName: string | null; gstin: string | null; phone: string | null; email: string | null; identityVerified: boolean; branch: { name: string; address: string; phone: string | null } | null };
   billTo: { name: string; patientRef: string };
   service: { appointmentRef: string; date: string } | null;
-  lines: { description: string; quantity: string; billing_unit: string; unit_price_paise: string; discount_paise: string; tax_rate_bp: number; tax_paise: string; total_paise: string }[];
+  lines: { description: string; quantity: string; billing_unit: string; unit_price_paise: string; discount_paise: string; tax_rate_bp: number; tax_inclusive?: boolean; tax_paise: string; total_paise: string }[];
   totals: { subtotalPaise: string; taxPaise: string; totalPaise: string };
+  /** Present on bills issued after discounts were added (migration 009). */
+  discount?: { totalPaise: string; bill: { type: "PERCENT" | "AMOUNT"; percent: string | null; amountPaise: string } | null };
   asOfIssue: { paymentsAppliedPaise: string; balanceDuePaise: string };
   roundingPolicy: string; rendererVersion: string;
 };
@@ -55,6 +57,11 @@ export default async function InvoicePrint({ params }: { params: Promise<{ id: s
     : { text: "PAYMENT DUE", tone: "due" as const };
   const hasDiscount = s.lines.some((l) => l.discount_paise !== "0");
   const hasTax = s.lines.some((l) => l.tax_paise !== "0") || s.totals.taxPaise !== "0";
+  const discountTotal = s.lines.reduce((a, l) => a + BigInt(l.discount_paise), 0n);
+  // Amount before discount = Σ qty × rate. Line total already excludes the discount; exclusive tax was added on top.
+  const grossTotal = s.lines.reduce((a, l) => a + BigInt(l.total_paise) + BigInt(l.discount_paise) - (l.tax_inclusive ? 0n : BigInt(l.tax_paise)), 0n);
+  const bill = s.discount?.bill ?? null;
+  const discountLabel = bill?.percent && BigInt(bill.amountPaise) === discountTotal ? `Less discount (${bill.percent})` : "Less discount";
   const statusChanged = !voided && dueNow !== null && dueNow.toString() !== s.asOfIssue.balanceDuePaise;
 
   return (
@@ -95,6 +102,10 @@ export default async function InvoicePrint({ params }: { params: Promise<{ id: s
       <div className="pd-sum">
         <p className="pd-words">Amount in words<strong>{amountInWords(total)}</strong></p>
         <table className="pd-totals"><tbody>
+          {discountTotal > 0n ? <>
+            <tr className="pd-sub"><td>Amount before discount</td><td>{formatINR(grossTotal)}</td></tr>
+            <tr className="pd-sub"><td>{discountLabel}</td><td>− {formatINR(discountTotal)}</td></tr>
+          </> : null}
           <tr className="pd-sub"><td>Sub total</td><td>{formatINR(s.totals.subtotalPaise)}</td></tr>
           {hasTax ? <tr className="pd-sub"><td>Tax</td><td>{formatINR(s.totals.taxPaise)}</td></tr> : null}
           <tr className="pd-grand"><td>Total (INR)</td><td>{formatINR(s.totals.totalPaise)}</td></tr>

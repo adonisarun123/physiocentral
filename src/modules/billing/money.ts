@@ -42,6 +42,60 @@ export function divRoundHalfUp(n: bigint, d: bigint): bigint {
   return (n * 2n + d) / (2n * d);
 }
 
+/**
+ * Parse a percentage ("10", "12.5", "7.25", optional trailing "%") into basis
+ * points (1% = 100 bp). Allowed: more than 0, up to 100, at most 2 decimals.
+ */
+export function parsePercentBp(input: string): number {
+  const s = input.trim().replace(/%$/, "").trim();
+  if (!/^\d{1,3}(\.\d{1,2})?$/.test(s)) throw new Error(`invalid percentage: ${input}`);
+  const [whole, frac = ""] = s.split(".");
+  const bp = Number(whole) * 100 + Number(frac.padEnd(2, "0"));
+  if (bp <= 0 || bp > 10000) throw new Error("percentage must be more than 0 and at most 100");
+  return bp;
+}
+
+/** Display a basis-point rate as a percentage: 1000 → "10%", 1250 → "12.5%". */
+export function formatPercentBp(bp: number): string {
+  const whole = Math.trunc(bp / 100);
+  const frac = String(bp % 100).padStart(2, "0").replace(/0+$/, "");
+  return `${whole}${frac ? `.${frac}` : ""}%`;
+}
+
+/** `bp` basis points of an amount, rounded half up to the paisa. */
+export function percentOfPaise(amountPaise: bigint, bp: number): bigint {
+  if (!Number.isInteger(bp) || bp < 0 || bp > 10000) throw new Error("bad percentage");
+  return divRoundHalfUp(amountPaise * BigInt(bp), 10000n);
+}
+
+/** Gross line amount (qty × rate), rounded the same way computeLine does. */
+export function lineGrossPaise(quantityMilli: bigint, unitPricePaise: bigint): bigint {
+  return divRoundHalfUp(quantityMilli * unitPricePaise, 1000n);
+}
+
+/**
+ * Split a whole-bill discount across lines in proportion to each line's amount,
+ * so per-line tax stays correct. Largest-remainder rounding: the shares add up
+ * to exactly `amountPaise`, and no share exceeds its line.
+ */
+export function allocateDiscount(basesPaise: bigint[], amountPaise: bigint): bigint[] {
+  if (amountPaise < 0n) throw new Error("negative discount");
+  if (basesPaise.some((b) => b < 0n)) throw new Error("negative line amount");
+  const total = basesPaise.reduce((a, b) => a + b, 0n);
+  if (amountPaise > total) throw new Error("discount exceeds bill amount");
+  if (amountPaise === 0n || total === 0n) return basesPaise.map(() => 0n);
+  const shares = basesPaise.map((b) => (b * amountPaise) / total);
+  let left = amountPaise - shares.reduce((a, b) => a + b, 0n);
+  const order = basesPaise
+    .map((b, i) => ({ i, rem: (b * amountPaise) % total }))
+    .sort((x, y) => (y.rem > x.rem ? 1 : y.rem < x.rem ? -1 : x.i - y.i));
+  for (const { i } of order) {
+    if (left === 0n) break;
+    if (shares[i] < basesPaise[i]) { shares[i] += 1n; left -= 1n; }
+  }
+  return shares;
+}
+
 export interface LineInput {
   quantityMilli: bigint;
   unitPricePaise: bigint;

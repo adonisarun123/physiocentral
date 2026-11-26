@@ -3,7 +3,7 @@ import { tx, q, q1, pgErrorCode, pgConstraint, type Db } from "@/lib/db";
 import { DomainError } from "@/lib/errors";
 import { audit, enqueue } from "@/modules/audit";
 import { assertPermission, type Actor, type StaffActor } from "@/modules/auth/actor";
-import { computeLine, financialYear, formatQuantity, parseQuantityMilli, parseRupeesToPaise, sumLines, ROUNDING_POLICY } from "./money";
+import { allocateDiscount, computeLine, financialYear, formatPercentBp, formatQuantity, lineGrossPaise, parsePercentBp, parseQuantityMilli, parseRupeesToPaise, percentOfPaise, sumLines, ROUNDING_POLICY } from "./money";
 
 export const RENDERER_VERSION = "html-print-v1";
 
@@ -35,7 +35,7 @@ async function draftFromCharges(db: Db, actor: StaffActor, patientId: string, ch
     unit_price_paise: string; discount_paise: string; tax_rate_bp: number; tax_inclusive: boolean;
   }>(
     `SELECT id, patient_id, description, billing_unit, quantity::text, unit_price_paise, discount_paise, tax_rate_bp, tax_inclusive
-       FROM billable_charge WHERE id = ANY($1::uuid[]) AND organization_id = $2 ORDER BY created_at, id`,
+       FROM billable_charge WHERE id = ANY($1::uuid[]) AND organization_id = $2 ORDER BY created_at, array_position($1::uuid[], id), id`,
     [chargeIds, actor.organizationId],
     db,
   );
@@ -70,7 +70,9 @@ async function draftFromCharges(db: Db, actor: StaffActor, patientId: string, ch
   return { invoiceId: inv.id };
 }
 
-export interface DirectLine { serviceId?: string | null; description?: string; quantity?: string; unitPriceRupees?: string; discountRupees?: string }
+export type DiscountType = "AMOUNT" | "PERCENT";
+/** `discountRupees` holds the discount as typed: rupees when discountType is AMOUNT (default), a percentage when PERCENT. */
+export interface DirectLine { serviceId?: string | null; description?: string; quantity?: string; unitPriceRupees?: string; discountRupees?: string; discountType?: DiscountType }
 
 /**
  * Invoice a patient directly — walk-ins, packages, braces/tape — without an
@@ -122,11 +124,17 @@ export async function createDirectInvoice(
       }
       if (price === null) throw new DomainError("VALIDATION", `Line ${n}: this service has no catalog price — enter a price.`);
       if (description.length < 2) throw new DomainError("VALIDATION", `Line ${n}: describe what is being billed.`);
+      const gross = lineGrossPaise(qty, price);
       let discount = 0n;
       if (l.discountRupees?.trim()) {
-        try { discount = parseRupeesToPaise(l.discountRupees); } catch { throw new DomainError("VALIDATION", `Line ${n}: enter a valid discount.`); }
+        if (l.discountType === "PERCENT") {
+          let bp: number;
+          try { bp = parsePercentBp(l.discountRupees); } catch { throw new DomainError("VALIDATION", `Line ${n}: enter a discount percentage between 0 and 100 (up to 2 decimals).`); }
+          discount = percentOfPaise(gross, bp);
+        } else {
+          try { discount = parseRupeesToPaise(l.discountRupees); } catch { throw new DomainError("VALIDATION", `Line ${n}: enter a valid discount.`); }
+        }
       }
-      const gross = (price * qty) / 1000n;
       if (discount > gross) throw new DomainError("VALIDATION", `Line ${n}: the discount is larger than the line amount.`);
       const row = (await q1<{ id: string }>(
         `INSERT INTO billable_charge (organization_id, patient_id, service_id, description, billing_unit, quantity, unit_price_paise,
@@ -137,6 +145,81 @@ export async function createDirectInvoice(
       chargeIds.push(row.id);
     }
     return draftFromCharges(db, actor, patient.id, chargeIds, null, correlationId);
+  });
+}
+
+/**
+ * Discount on the whole bill, as a percentage or a rupee amount, on a DRAFT.
+ * The discount is split across the lines in proportion to each line's amount
+ * after its own discount (so per-line tax stays right) and added on top of
+ * that line discount. Re-applying replaces the previous bill discount;
+ * type NONE removes it. A reason is required and the change is audited.
+ * Issued bills can't be discounted — use a credit note.
+ */
+export async function applyBillDiscount(
+  actor: Actor,
+  input: { invoiceId: string; expectedVersion: number; type: DiscountType | "NONE"; value?: string; reason?: string },
+  correlationId: string,
+) {
+  assertPermission(actor, "INVOICE_DRAFT");
+  return tx(async (db) => {
+    const inv = await q1<{ id: string; status: string; version: number; bill_discount_type: string | null; bill_discount_paise: string }>(
+      `SELECT id, status, version, bill_discount_type, bill_discount_paise FROM invoice WHERE id=$1 AND organization_id=$2 FOR UPDATE`,
+      [input.invoiceId, actor.organizationId], db);
+    if (!inv) throw new DomainError("NOT_FOUND", "Invoice not found.");
+    if (inv.status !== "DRAFT") throw new DomainError("INVALID_TRANSITION", "This bill is already issued. To reduce it now, raise a credit note.");
+    if (inv.version !== input.expectedVersion) throw new DomainError("STALE_VERSION", "This draft changed since you opened it. Reload and try again.");
+
+    const lines = await q<{ id: string; quantity: string; unit_price_paise: string; tax_rate_bp: number; tax_inclusive: boolean; base_discount_paise: string }>(
+      `SELECT l.id, l.quantity::text, l.unit_price_paise, l.tax_rate_bp, l.tax_inclusive, c.discount_paise AS base_discount_paise
+         FROM invoice_line l JOIN billable_charge c ON c.id = l.billable_charge_id
+        WHERE l.invoice_id=$1 ORDER BY l.sort_order, l.id`, [inv.id], db);
+    if (!lines.length) throw new DomainError("VALIDATION", "This draft has no lines.");
+    const bases = lines.map((l) => lineGrossPaise(parseQuantityMilli(l.quantity), BigInt(l.unit_price_paise)) - BigInt(l.base_discount_paise));
+    const billable = bases.reduce((a, b) => a + b, 0n);
+
+    let bp: number | null = null;
+    let amount = 0n;
+    const reason = (input.reason ?? "").trim();
+    if (input.type !== "NONE") {
+      const raw = (input.value ?? "").trim();
+      if (!raw) throw new DomainError("VALIDATION", "Enter the discount.", { value: "Required" });
+      if (input.type === "PERCENT") {
+        try { bp = parsePercentBp(raw); } catch { throw new DomainError("VALIDATION", "Enter a percentage more than 0 and up to 100 (up to 2 decimals).", { value: "Invalid" }); }
+        amount = percentOfPaise(billable, bp);
+      } else {
+        try { amount = parseRupeesToPaise(raw); } catch { throw new DomainError("VALIDATION", "Enter a valid rupee amount.", { value: "Invalid" }); }
+        if (amount <= 0n) throw new DomainError("VALIDATION", "The discount must be more than zero.", { value: "Invalid" });
+        if (amount > billable) throw new DomainError("VALIDATION", "The discount is more than the bill amount.", { value: "Too large" });
+      }
+      if (reason.length < 3) throw new DomainError("VALIDATION", "Give a reason for the discount (it is kept in the audit history, not printed on the bill).", { reason: "Required" });
+      if (reason.length > 300) throw new DomainError("VALIDATION", "Keep the reason under 300 characters.", { reason: "Too long" });
+    }
+
+    const shares = allocateDiscount(bases, amount);
+    for (const [i, l] of lines.entries()) {
+      const discount = BigInt(l.base_discount_paise) + shares[i];
+      const r = computeLine({
+        quantityMilli: parseQuantityMilli(l.quantity), unitPricePaise: BigInt(l.unit_price_paise),
+        discountPaise: discount, taxRateBp: l.tax_rate_bp, taxInclusive: l.tax_inclusive,
+      });
+      await db.query(
+        `UPDATE invoice_line SET discount_paise=$2, taxable_paise=$3, tax_paise=$4, total_paise=$5 WHERE id=$1`,
+        [l.id, discount.toString(), r.taxablePaise.toString(), r.taxPaise.toString(), r.totalPaise.toString()]);
+    }
+    await db.query(
+      `UPDATE invoice SET bill_discount_type=$2, bill_discount_bp=$3, bill_discount_paise=$4, bill_discount_reason=$5, bill_discount_by=$6 WHERE id=$1`,
+      [inv.id, input.type === "NONE" ? null : input.type, bp, amount.toString(), input.type === "NONE" ? null : reason, input.type === "NONE" ? null : actor.label]);
+    await recomputeInvoiceTotals(db, inv.id);
+    await audit(db, {
+      organizationId: actor.organizationId, actor: actor.label,
+      action: input.type === "NONE" ? "invoice.discount.remove" : "invoice.discount.apply",
+      targetType: "invoice", targetId: inv.id,
+      changes: { from: { type: inv.bill_discount_type, paise: inv.bill_discount_paise }, to: { type: input.type === "NONE" ? null : input.type, percent: bp === null ? null : formatPercentBp(bp), paise: amount.toString() } },
+      reason: reason || null,
+      correlationId,
+    });
+    return { discountPaise: amount, percentBp: bp };
   });
 }
 
@@ -172,7 +255,8 @@ export async function discardDraftInvoice(actor: Actor, invoiceId: string, expec
 export async function issueInvoice(actor: Actor, input: { invoiceId: string; expectedVersion: number }, correlationId: string) {
   assertPermission(actor, "INVOICE_ISSUE");
   return tx(async (db) => {
-    const inv = await q1<{ id: string; status: string; version: number; patient_id: string; appointment_id: string | null; subtotal_paise: string; tax_paise: string; total_paise: string }>(
+    const inv = await q1<{ id: string; status: string; version: number; patient_id: string; appointment_id: string | null; subtotal_paise: string; tax_paise: string; total_paise: string;
+      bill_discount_type: DiscountType | null; bill_discount_bp: number | null; bill_discount_paise: string }>(
       `SELECT * FROM invoice WHERE id=$1 AND organization_id=$2 FOR UPDATE`, [input.invoiceId, actor.organizationId], db);
     if (!inv) throw new DomainError("NOT_FOUND", "Invoice not found.");
     if (inv.status !== "DRAFT") throw new DomainError("INVALID_TRANSITION", "This invoice is already issued and cannot be edited (UAT-21).");
@@ -220,6 +304,12 @@ export async function issueInvoice(actor: Actor, input: { invoiceId: string; exp
       service: branch ? { appointmentRef: branch.public_ref, date: new Date(branch.starts_at).toISOString() } : null,
       lines,
       totals: { subtotalPaise: inv.subtotal_paise, taxPaise: inv.tax_paise, totalPaise: inv.total_paise },
+      discount: {
+        totalPaise: lines.reduce((a, l) => a + BigInt(l.discount_paise), 0n).toString(),
+        bill: inv.bill_discount_type
+          ? { type: inv.bill_discount_type, percent: inv.bill_discount_bp === null ? null : formatPercentBp(inv.bill_discount_bp), amountPaise: inv.bill_discount_paise }
+          : null,
+      },
       asOfIssue: { paymentsAppliedPaise: "0", balanceDuePaise: inv.total_paise },
       roundingPolicy: ROUNDING_POLICY,
       rendererVersion: RENDERER_VERSION,

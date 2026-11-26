@@ -8,10 +8,11 @@ import type { StaffActor } from "@/modules/auth/actor";
 import type { ActionResult } from "@/components/action-form";
 import { acceptAppointment, cancelAppointment, rejectAppointment, transitionAppointment, type TransitionName } from "@/modules/scheduling/appointments";
 import { addEstimateLine, createEstimate, decideEstimate, markEstimateLinePerformed, removeEstimateLine, reviseEstimate, sendEstimateVersion } from "@/modules/billing/estimates";
-import { createDirectInvoice, createDraftInvoice, discardDraftInvoice, issueInvoice } from "@/modules/billing/invoices";
+import { applyBillDiscount, createDirectInvoice, createDraftInvoice, discardDraftInvoice, issueInvoice } from "@/modules/billing/invoices";
 import { createPatient, updatePatient, attachRequestToPatient } from "@/modules/patients/admin";
 import { createPackageBooking, createStaffBooking, setPackageStatus } from "@/modules/scheduling/staff-booking";
 import { createStaffLogin, resetStaffPassword, setStaffActive, updateStaff } from "@/modules/staff/admin";
+import { formatINR, formatPercentBp } from "@/modules/billing/money";
 import { allocatePayment, recordManualPayment, verifyPayment } from "@/modules/payments/manual";
 import { refundPayment, reversePayment } from "@/modules/payments/refunds";
 import { addPriceVersion, createService, setServiceStatus, updateServiceDetails } from "@/modules/catalog/admin";
@@ -118,6 +119,16 @@ export async function createInvoiceAction(_: ActionResult, fd: FormData): Promis
 
 export async function issueInvoiceAction(_: ActionResult, fd: FormData) {
   return run(async (a, cid) => { const r = await issueInvoice(a, { invoiceId: s(fd, "id"), expectedVersion: n(fd, "version") }, cid); return `Issued ${r.number}.`; }, [`/admin/invoices/${s(fd, "id")}`, "/admin/invoices"]);
+}
+
+export async function billDiscountAction(_: ActionResult, fd: FormData) {
+  return run(async (a, cid) => {
+    const raw = s(fd, "type");
+    const type = raw === "PERCENT" || raw === "AMOUNT" ? raw : "NONE";
+    const r = await applyBillDiscount(a, { invoiceId: s(fd, "id"), expectedVersion: n(fd, "version"), type, value: s(fd, "value"), reason: s(fd, "reason") }, cid);
+    if (type === "NONE") return "Discount removed.";
+    return `Discount of ${formatINR(r.discountPaise)}${r.percentBp !== null ? ` (${formatPercentBp(r.percentBp)})` : ""} applied.`;
+  }, [`/admin/invoices/${s(fd, "id")}`, "/admin/invoices"]);
 }
 
 export async function discardInvoiceAction(_: ActionResult, fd: FormData): Promise<ActionResult> {
@@ -360,6 +371,7 @@ export async function directInvoiceAction(_: ActionResult, fd: FormData): Promis
     const lines = Array.from({ length: count }, (_, i) => ({
       serviceId: s(fd, `l${i}service`) || null, description: s(fd, `l${i}desc`), quantity: s(fd, `l${i}qty`),
       unitPriceRupees: s(fd, `l${i}price`), discountRupees: s(fd, `l${i}disc`),
+      discountType: s(fd, `l${i}discType`) === "PERCENT" ? "PERCENT" as const : "AMOUNT" as const,
     }));
     const r = await createDirectInvoice(a, { patientId: s(fd, "patientId"), lines }, cid);
     id = r.invoiceId;

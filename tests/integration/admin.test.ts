@@ -6,7 +6,7 @@ import { addTimeOff, createTherapist, removeTimeOff, setTherapistActive, setTher
 import { createService, updateServiceDetails } from "@/modules/catalog/admin";
 import { createPatient, searchPatients } from "@/modules/patients/admin";
 import { createStaffBooking } from "@/modules/scheduling/staff-booking";
-import { createDirectInvoice, issueInvoice } from "@/modules/billing/invoices";
+import { applyBillDiscount, createDirectInvoice, issueInvoice } from "@/modules/billing/invoices";
 import { recordManualPayment } from "@/modules/payments/manual";
 import { setStaffActive, updateStaff, resetStaffPassword, tempPassword } from "@/modules/staff/admin";
 import { permissionsFor } from "@/modules/auth/permissions";
@@ -199,5 +199,58 @@ describe("staff logins: lock-out guards", () => {
     await updateStaff(f.owner, { staffId: f.billing.staffId, name: "Billing person", roles: ["BILLING", "RECEPTIONIST"] }, "t");
     const r = await q1<{ roles: string[] }>(`SELECT array_agg(role ORDER BY role) roles FROM role_grant WHERE staff_member_id=$1`, [f.billing.staffId]);
     expect(r!.roles).toEqual(["BILLING", "RECEPTIONIST"]);
+  });
+});
+
+describe("patient discounts", () => {
+  const inv = (id: string) => q1<{ version: number; status: string; total_paise: string; bill_discount_paise: string; bill_discount_type: string | null }>(
+    `SELECT version, status, total_paise, bill_discount_paise, bill_discount_type FROM invoice WHERE id=$1`, [id]);
+
+  it("line discount can be a percentage", async () => {
+    const { patientId } = await createPatient(f.receptionist, { fullName: "Discount Pct", phone: "+919800000301" }, "t");
+    const { invoiceId } = await createDirectInvoice(f.receptionist, { patientId, lines: [
+      { description: "Session", unitPriceRupees: "1000", quantity: "2", discountRupees: "10", discountType: "PERCENT" }, // ₹2000 − ₹200
+    ] }, "t");
+    expect((await inv(invoiceId))!.total_paise).toBe("180000");
+    await expectCode(createDirectInvoice(f.receptionist, { patientId, lines: [{ description: "Tape", unitPriceRupees: "100", discountRupees: "101", discountType: "PERCENT" }] }, "t"), "VALIDATION");
+  });
+
+  it("whole-bill discount: percent, amount, replace, remove; frozen after issue", async () => {
+    const { patientId } = await createPatient(f.receptionist, { fullName: "Discount Bill", phone: "+919800000302" }, "t");
+    const { invoiceId } = await createDirectInvoice(f.receptionist, { patientId, lines: [
+      { description: "Assessment", unitPriceRupees: "800" },
+      { description: "Session", unitPriceRupees: "600", discountRupees: "100" }, // line discount stays
+    ] }, "t"); // ₹800 + ₹500 = ₹1300
+    let v = (await inv(invoiceId))!;
+    expect(v.total_paise).toBe("130000");
+
+    await expectCode(applyBillDiscount(f.receptionist, { invoiceId, expectedVersion: v.version, type: "PERCENT", value: "10", reason: "" }, "t"), "VALIDATION");
+    await applyBillDiscount(f.receptionist, { invoiceId, expectedVersion: v.version, type: "PERCENT", value: "10", reason: "Senior citizen" }, "t");
+    v = (await inv(invoiceId))!;
+    expect(v.bill_discount_paise).toBe("13000");
+    expect(v.total_paise).toBe("117000");
+    const lines = await getPool().query(`SELECT discount_paise FROM invoice_line WHERE invoice_id=$1 ORDER BY sort_order`, [invoiceId]);
+    expect(lines.rows.map((r) => r.discount_paise)).toEqual(["8000", "15000"]); // 10% of 800; ₹100 own + 10% of 500
+
+    await expectCode(applyBillDiscount(f.receptionist, { invoiceId, expectedVersion: v.version - 1, type: "AMOUNT", value: "50", reason: "x y z" }, "t"), "STALE_VERSION");
+    await expectCode(applyBillDiscount(f.receptionist, { invoiceId, expectedVersion: v.version, type: "AMOUNT", value: "1300.01", reason: "Too much" }, "t"), "VALIDATION");
+    await applyBillDiscount(f.receptionist, { invoiceId, expectedVersion: v.version, type: "AMOUNT", value: "300", reason: "Package offer" }, "t");
+    v = (await inv(invoiceId))!;
+    expect(v.total_paise).toBe("100000");
+    expect(v.bill_discount_type).toBe("AMOUNT");
+
+    await applyBillDiscount(f.receptionist, { invoiceId, expectedVersion: v.version, type: "NONE" }, "t");
+    v = (await inv(invoiceId))!;
+    expect(v.total_paise).toBe("130000");
+    expect(v.bill_discount_paise).toBe("0");
+
+    await applyBillDiscount(f.receptionist, { invoiceId, expectedVersion: v.version, type: "PERCENT", value: "12.5", reason: "Staff family" }, "t");
+    v = (await inv(invoiceId))!;
+    await issueInvoice(f.billing, { invoiceId, expectedVersion: v.version }, "t");
+    const issued = await q1<{ snapshot: { discount: { totalPaise: string; bill: { percent: string } } } }>(`SELECT snapshot FROM invoice WHERE id=$1`, [invoiceId]);
+    expect(issued!.snapshot.discount.bill.percent).toBe("12.5%");
+    expect(issued!.snapshot.discount.totalPaise).toBe(String(10000 + 16250));
+    v = (await inv(invoiceId))!;
+    await expectCode(applyBillDiscount(f.receptionist, { invoiceId, expectedVersion: v.version, type: "AMOUNT", value: "10", reason: "late" }, "t"), "INVALID_TRANSITION");
   });
 });
