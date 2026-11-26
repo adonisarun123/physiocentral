@@ -13,6 +13,7 @@ import { MediaPanel, serviceImage } from "@/components/site/media";
 import { nextAvailableLabel } from "@/modules/content/live";
 import { ORTHO } from "@/components/site/ortho-referral";
 import { pageOpenGraph } from "@/lib/seo";
+import { GoogleReviews } from "@/components/site/google-reviews";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { alternates: { canonical: "/" }, openGraph: pageOpenGraph("/") };
@@ -239,6 +240,9 @@ export default async function HomePage() {
           </dl>
         </div>
       </section>
+
+      {/* ───── Google reviews (verbatim, see src/content/google-reviews.ts) ───── */}
+      <GoogleReviews />
 
       {/* ───── FAQ (M3 list) ───── */}
       <section className="section" aria-labelledby="faq-h">

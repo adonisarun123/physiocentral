@@ -11,6 +11,7 @@ import { ORTHO } from "@/components/site/ortho-referral";
 import { getPost } from "@/content/blog/posts";
 import { AREAS } from "@/content/areas";
 import { pageOpenGraph } from "@/lib/seo";
+import { GoogleReviews } from "@/components/site/google-reviews";
 
 export const dynamic = "force-dynamic";
 
@@ -178,6 +179,9 @@ export default async function HsrLayoutPage() {
           </div>
         </aside>
       </section>
+
+      {/* Google reviews */}
+      <GoogleReviews headingId="reviews-h" limit={6} />
 
       {/* Team */}
       <section className="bg-[var(--md-sys-color-surface-container)]" aria-labelledby="team-h">
